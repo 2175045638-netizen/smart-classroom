@@ -230,3 +230,4 @@ elif st.session_state.page == "leaderboard":
     if st.button("返回"):
         st.session_state.page = "dashboard"
         st.rerun()
+        # D:\conda\Scripts\streamlit.exe run .\app.py
