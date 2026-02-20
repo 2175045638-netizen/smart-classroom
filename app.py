@@ -1,22 +1,32 @@
 import streamlit as st
 import pandas as pd
 import time
-import datetime
+from streamlit_gsheets import GSheetsConnection
+
+# --- 0. 数据库连接与初始化 ---
+# 在 Streamlit Cloud 的 Secrets 中配置表格链接
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+def get_data():
+    # ttl=0 确保每次读取都是最新的云端数据
+    return conn.read(ttl=0)
+
+def save_data(df):
+    conn.update(data=df)
+    st.cache_data.clear()
 
 # --- 初始化全局状态 ---
 def init_state():
     if 'page' not in st.session_state:
-        st.session_state.page = "login"  # login, dashboard, learning, quiz, result
+        st.session_state.page = "login"
     if 'user' not in st.session_state:
         st.session_state.user = ""
     if 'score' not in st.session_state:
         st.session_state.score = 0
     if 'learned_modules' not in st.session_state:
-        st.session_state.learned_modules = set() # 记录已学完的板块
-    if 'quiz_active' not in st.session_state:
-        st.session_state.quiz_active = False # 锁定模式
+        st.session_state.learned_modules = set()
     if 'step' not in st.session_state:
-        st.session_state.step = 0 # 教学步骤
+        st.session_state.step = 0
 
 init_state()
 
@@ -36,198 +46,142 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 模拟排行榜数据 ---
-@st.cache_data
-def get_mock_leaderboard():
-    return pd.DataFrame({
-        "学生": ["王小明", "李华", "张三", "赵敏"],
-        "总积分": [120, 110, 95, 80]
-    })
+# --- 教师后台管理 (侧边栏) ---
+with st.sidebar:
+    st.title("⚙️ 管理面板")
+    admin_pwd = st.text_input("管理员密码", type="password")
+    if admin_pwd == "666888": # 你可以修改自己的密码
+        st.subheader("👨‍🏫 教师后台数据管理")
+        all_data = get_data()
+        edited_df = st.data_editor(all_data, num_rows="dynamic")
+        if st.button("💾 保存修改到云端"):
+            save_data(edited_df)
+            st.success("云端数据同步成功！")
 
 # --- 1. 登录页面 ---
 if st.session_state.page == "login":
     st.title("🌟 智能课堂互动系统")
-    with st.container():
-        name = st.text_input("请输入姓名以登录")
-        if st.button("进入教室"):
-            if name:
-                st.session_state.user = name
-                st.session_state.page = "dashboard"
-                st.rerun()
+    name = st.text_input("请输入姓名以登录")
+    if st.button("进入教室"):
+        if name:
+            st.session_state.user = name
+            # 登录时从云端同步该学生的旧积分
+            df = get_data()
+            if name in df["学生"].values:
+                st.session_state.score = int(df[df["学生"] == name]["总积分"].iloc[0])
+            else:
+                # 新学生自动注册
+                new_user = pd.DataFrame([{"学生": name, "总积分": 0}])
+                save_data(pd.concat([df, new_user], ignore_index=True))
+            st.session_state.page = "dashboard"
+            st.rerun()
 
-# --- 2. 仪表盘 (知识板块选择) ---
+# --- 2. 仪表盘 ---
 elif st.session_state.page == "dashboard":
     st.title(f"👋 你好, {st.session_state.user}")
-    
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("我的总积分", st.session_state.score)
+        st.metric("我的当前积分", st.session_state.score)
     with col2:
         if st.button("🏆 查看班级排行榜"):
             st.session_state.page = "leaderboard"
             st.rerun()
 
     st.subheader("📚 课程知识地图")
-    
-    # 路径规划板块
     with st.expander("📍 路径规划算法板块", expanded=True):
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown('<div class="algo-card"><h3>Dijkstra 算法</h3><p>从单点到所有点的最短路径</p></div>', unsafe_allow_html=True)
+            st.markdown('<div class="algo-card"><h3>Dijkstra 算法</h3></div>', unsafe_allow_html=True)
             if st.button("进入学习", key="dij"):
-                st.session_state.current_algo = "Dijkstra"
-                st.session_state.page = "learning"
-                st.session_state.step = 0
-                st.rerun()
+                st.session_state.current_algo = "Dijkstra"; st.session_state.page = "learning"; st.session_state.step = 0; st.rerun()
         with c2:
-            st.markdown('<div class="algo-card"><h3>A* 算法</h3><p>启发式搜索：更快、更智能</p></div>', unsafe_allow_html=True)
+            st.markdown('<div class="algo-card"><h3>A* 算法</h3></div>', unsafe_allow_html=True)
             if st.button("进入学习", key="astar"):
-                st.session_state.current_algo = "AStar"
-                st.session_state.page = "learning"
-                st.session_state.step = 0
-                st.rerun()
+                st.session_state.current_algo = "AStar"; st.session_state.page = "learning"; st.session_state.step = 0; st.rerun()
 
-    # 老师发布的任务区
     st.divider()
-    st.warning("🔔 老师发布了新任务：路径规划随堂测试 (限时 60s)")
-    if st.button("🚀 开始进入答题模式 (进入后无法退出)"):
-        st.session_state.page = "quiz"
-        st.session_state.quiz_step = 1
-        st.session_state.quiz_score = 0
-        st.session_state.start_time = time.time()
-        st.rerun()
+    st.warning("🔔 限时随堂测试已发布")
+    if st.button("🚀 开始进入答题模式"):
+        st.session_state.page = "quiz"; st.session_state.quiz_step = 1; st.session_state.quiz_score = 0; st.session_state.start_time = time.time(); st.rerun()
 
-# --- 3. 教学模式 (分步走) ---
+# --- 3. 教学模式 ---
 elif st.session_state.page == "learning":
     algo = st.session_state.current_algo
-    st.title(f"📖 正在学习: {algo}")
-    
     steps = {
         "AStar": [
-            {"t": "核心概念：贪心算法", "c": "贪心算法每一步都选择当前看起来最优的路径...", "img": "💡"},
-            {"t": "启发式搜索 (Heuristic)", "c": "A*引入了 h(n)，即预测到终点的距离。公式：f=g+h", "img": "🔍"},
-            {"t": "搜索迭代可视化", "c": "看！A* 优先探索朝向终点的方格，而不是像水波一样扩散。", "img": "🗺️"},
-            {"t": "小结", "c": "A* 是带了GPS的 Dijkstra。", "img": "✅"}
+            {"t": "核心概念：贪心算法", "c": "贪心算法选择当前最优路径...", "img": "💡"},
+            {"t": "启发式搜索", "c": "A* 引入了 h(n) 预估代价。", "img": "🔍"}
         ],
         "Dijkstra": [
-            {"t": "核心概念：广度优先", "c": "Dijkstra 确保找到最短路径，它不放过任何一个可能的节点。", "img": "🌊"},
-            {"t": "迭代过程", "c": "不断更新起点到邻居节点的距离...", "img": "🔢"}
+            {"t": "广度优先搜索", "c": "确保最短路径，但搜索范围广。", "img": "🌊"}
         ]
     }
+    data = steps[algo][st.session_state.step]
+    st.header(data['t']); st.write(data['c']); st.title(data['img'])
     
-    current_step_data = steps[algo][st.session_state.step]
-    
-    st.info(f"第 {st.session_state.step + 1} 步 / 共 {len(steps[algo])} 步")
-    st.header(current_step_data['t'])
-    st.write(current_step_data['c'])
-    st.title(current_step_data['img']) # 模拟图像/动图
-    
-    cols = st.columns([1,1,1])
-    with cols[0]:
-        if st.session_state.step > 0:
-            if st.button("上一步"):
-                st.session_state.step -= 1
-                st.rerun()
-    with cols[2]:
+    col_l, col_m, col_r = st.columns(3)
+    with col_l:
+        if st.session_state.step > 0 and st.button("上一步"):
+            st.session_state.step -= 1; st.rerun()
+    with col_r:
         if st.session_state.step < len(steps[algo]) - 1:
-            if st.button("下一步"):
-                st.session_state.step += 1
-                st.rerun()
+            if st.button("下一步"): st.session_state.step += 1; st.rerun()
+        elif algo not in st.session_state.learned_modules:
+            if st.button("🏁 知识检验"): st.session_state.page = "learning_test"; st.rerun()
         else:
-            if algo not in st.session_state.learned_modules:
-                if st.button("🏁 完成学习并进入知识检验"):
-                    st.session_state.page = "learning_test"
-                    st.rerun()
-            else:
-                st.success("本模块已学完，积分已领取。")
-                if st.button("返回首页"):
-                    st.session_state.page = "dashboard"
-                    st.rerun()
+            if st.button("返回首页"): st.session_state.page = "dashboard"; st.rerun()
 
-# --- 4. 知识检验 (学完后的测试) ---
+# --- 4. 知识检验 ---
 elif st.session_state.page == "learning_test":
     st.header("🎯 知识检验")
-    q = st.radio("A* 算法中，f = g + h，h 代表什么？", ["起点距离", "预估终点距离", "随机值"])
-    if st.button("提交结果"):
+    q = st.radio("A* 公式中 h 代表什么？", ["起点距离", "预估终点距离"])
+    if st.button("提交答案"):
         if "预估" in q:
             st.session_state.score += 50
             st.session_state.learned_modules.add(st.session_state.current_algo)
-            st.success("回答正确！获得 50 积分奖励！")
-        else:
-            st.error("回答错误，请重新回顾知识点。")
-        time.sleep(2)
-        st.session_state.page = "dashboard"
-        st.rerun()
+            # 学习完立刻同步积分到云端
+            df = get_data()
+            df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
+            save_data(df)
+            st.success("获得 50 积分！已保存到云端。")
+        time.sleep(1); st.session_state.page = "dashboard"; st.rerun()
 
-# --- 5. 课堂答题模式 (锁定模式) ---
+# --- 5. 课堂答题 (锁定模式) ---
 elif st.session_state.page == "quiz":
-    # 隐藏侧边栏逻辑 (在Streamlit中通过不渲染侧边栏内容实现)
-    st.empty() 
-    
-    # 倒计时逻辑
-    limit = 60 # 老师设置的60秒
     elapsed = time.time() - st.session_state.start_time
-    remaining = max(0, int(limit - elapsed))
-    
+    remaining = max(0, int(60 - elapsed))
     st.error(f"⏱️ 剩余时间: {remaining} 秒")
-    if remaining <= 0:
-        st.session_state.page = "result"
-        st.rerun()
+    if remaining <= 0: st.session_state.page = "result"; st.rerun()
 
-    st.subheader(f"第 {st.session_state.quiz_step} 题 / 共 2 题")
-    
     if st.session_state.quiz_step == 1:
-        ans = st.selectbox("Dijkstra 算法是否一定能找到最短路径？", ["请选择", "是", "否"])
-        if st.button("提交答案并下一题"):
-            if ans == "是":
-                # 根据时间给分，越快分越高
-                st.session_state.quiz_score += int(20 + (remaining/2))
-            st.session_state.quiz_step = 2
-            st.rerun()
-            
-    elif st.session_state.quiz_step == 2:
-        ans = st.text_input("请输入 A* 算法的核心公式 (例如 a=b+c)")
-        if st.button("提交并结算"):
-            if "f=g+h" in ans.lower().replace(" ", ""):
-                st.session_state.quiz_score += int(20 + (remaining/2))
-            st.session_state.page = "result"
-            st.rerun()
+        ans = st.selectbox("Dijkstra 一定能找到最短路径？", ["请选择", "是", "否"])
+        if st.button("下一题") and ans != "请选择":
+            if ans == "是": st.session_state.quiz_score += int(20 + remaining/2)
+            st.session_state.quiz_step = 2; st.rerun()
+    else:
+        ans = st.text_input("A* 公式？")
+        if st.button("提交结果"):
+            if "f=g+h" in ans.lower().replace(" ",""): st.session_state.quiz_score += int(20 + remaining/2)
+            st.session_state.page = "result"; st.rerun()
 
 # --- 6. 结果与排行榜 ---
 elif st.session_state.page == "result":
-    st.balloons()
     st.title("📊 答题报告")
     st.metric("本次得分", st.session_state.quiz_score)
-    
-    # 额外奖励逻辑
-    bonus = 0
-    if st.session_state.quiz_score > 40: # 模拟前三名逻辑
-        bonus = 30
-        st.success(f"🎊 表现优异！获得额外排名奖励 {bonus} 积分！")
-    
-    st.session_state.score += (st.session_state.quiz_score + bonus)
-    
-    if st.button("返回大厅"):
-        st.session_state.page = "dashboard"
-        st.rerun()
+    st.session_state.score += st.session_state.quiz_score
+    # 答题结束同步总分到云端
+    df = get_data()
+    df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
+    save_data(df)
+    if st.button("返回大厅"): st.session_state.page = "dashboard"; st.rerun()
 
 elif st.session_state.page == "leaderboard":
     st.title("🏆 班级荣誉榜")
-    df = get_mock_leaderboard()
-    # 加入当前用户
-    new_row = pd.DataFrame({"学生": [st.session_state.user], "总积分": [st.session_state.score]})
-    df = pd.concat([df, new_row]).sort_values(by="总积分", ascending=False).reset_index(drop=True)
-    
+    df = get_data().sort_values(by="总积分", ascending=False).reset_index(drop=True)
     for i, row in df.iterrows():
-        rank_style = f"rank-{i+1}" if i < 3 else ""
-        st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee;">
-            <span class="{rank_style}">第 {i+1} 名: {row['学生']}</span>
-            <span style="font-weight: bold;">{row['总积分']} pts</span>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    if st.button("返回"):
-        st.session_state.page = "dashboard"
-        st.rerun()
+        style = f"rank-{i+1}" if i < 3 else ""
+        st.markdown(f'<div style="display:flex; justify-content:space-between; padding:10px;">'
+                    f'<span class="{style}">第 {i+1} 名: {row["学生"]}</span>'
+                    f'<span>{row["总积分"]} pts</span></div>', unsafe_allow_html=True)
+    if st.button("返回"): st.session_state.page = "dashboard"; st.rerun()
         # D:\conda\Scripts\streamlit.exe run .\app.py
