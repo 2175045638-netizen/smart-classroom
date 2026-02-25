@@ -121,6 +121,23 @@ elif st.session_state.page == "learning":
              {"t": "启发式搜索", "c": "A* 引入了 h(n) 预估代价。", "img": "🔍"}
         ]
     }
+
+    if algo in steps:
+        for step in steps[algo]:
+            st.subheader(step["t"])
+            
+            # 这里的布局可以根据是否有图片来调整
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.write(step["c"])
+            with col2:
+                # 判断是图片路径还是表情包
+                if step["img"].endswith(('.png', '.jpg', '.jpeg')):
+                    st.image(step["img"])
+                else:
+                    st.title(step["img"]) # 显示大号表情
+            st.divider()
+
     data = steps[algo][st.session_state.step]
     st.header(data['t']); st.write(data['c']); st.title(data['img'])
     
