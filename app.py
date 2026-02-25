@@ -117,42 +117,61 @@ elif st.session_state.page == "learning":
              "c": ("迪杰斯特拉算法（Dijkstra's Algorithm）是由荷兰计算机科学家艾兹赫尔·戴克斯特拉在 1956 年提出的一种单源最短路径算法。\n\n"
                   "该算法的核心思想是贪心策略，每次都选择当前已知距离源点最近的一个节点，并以此节点为基准去更新它相邻节点的距离，从而在一个包含多个节点和带有非负权重边的图中，找到从一个指定的“源点”到图中所有其他节点的最短距离。\n\n"
                   "我们将以下图为例，学习应用该算法。"), 
-             "img": "assets\dijkstra_demo1.png"},
+             "img": "assets/dijkstra_demo1.png"},
              {"t": "启发式搜索", "c": "A* 引入了 h(n) 预估代价。", "img": "🔍"}
         ]
     }
 
-    if algo in steps:
-        for step in steps[algo]:
-            st.subheader(step["t"])
-            
-            # 这里的布局可以根据是否有图片来调整
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                st.write(step["c"])
-            with col2:
-                # 判断是图片路径还是表情包
-                if step["img"].endswith(('.png', '.jpg', '.jpeg')):
-                    st.image(step["img"])
-                else:
-                    st.title(step["img"]) # 显示大号表情
-            st.divider()
-
+    if "step" not in st.session_state:
+        st.session_state.step = 0
+        
     data = steps[algo][st.session_state.step]
-    st.header(data['t']); st.write(data['c']); st.title(data['img'])
+
+    # 3. 渲染当前步骤
+    st.subheader(f"正在学习: {algo}")
+    st.divider()
+
+    col1, col2 = st.columns([3, 2])
     
-    col_l, col_m, col_r = st.columns(3)
+    with col1:
+        st.header(data['t'])
+        st.write(data['c'])
+    
+    with col2:
+        img_path = data['img']
+        # 优化判断逻辑
+        if "/" in img_path or img_path.endswith(('.png', '.jpg', '.jpeg')):
+            try:
+                st.image(img_path, use_container_width=True)
+            except Exception as e:
+                st.error(f"图片加载失败，请检查 GitHub 仓库中是否存在: {img_path}")
+        else:
+            # 如果是表情符号
+            st.markdown(f"<h1 style='text-align: center; font-size: 100px;'>{img_path}</h1>", unsafe_allow_html=True)
+
+    st.divider()
+
+    # 4. 底部导航按钮
+    col_l, col_m, col_r = st.columns([1, 1, 1])
     with col_l:
-        if st.session_state.step > 0 and st.button("上一步"):
-            st.session_state.step -= 1; st.rerun()
+        if st.session_state.step > 0:
+            if st.button("⬅️ 上一步"):
+                st.session_state.step -= 1
+                st.rerun()
+    
     with col_r:
         if st.session_state.step < len(steps[algo]) - 1:
-            if st.button("下一步"): st.session_state.step += 1; st.rerun()
+            if st.button("下一步 ➡️"):
+                st.session_state.step += 1
+                st.rerun()
         elif algo not in st.session_state.learned_modules:
-            if st.button("🏁 知识检验"): st.session_state.page = "learning_test"; st.rerun()
+            if st.button("🏁 知识检验"):
+                st.session_state.page = "learning_test"
+                st.rerun()
         else:
-            if st.button("返回首页"): st.session_state.page = "dashboard"; st.rerun()
-
+            if st.button("🏠 返回首页"):
+                st.session_state.page = "dashboard"
+                st.rerun()
 # --- 4. 知识检验 ---
 elif st.session_state.page == "learning_test":
     st.header("🎯 知识检验")
