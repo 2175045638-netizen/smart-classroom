@@ -113,12 +113,14 @@ elif st.session_state.page == "learning":
             {"t": "启发式搜索", "c": "A* 引入了 h(n) 预估代价。", "img": "🔍"}
         ],
         "Dijkstra": [
-            {"t": "算法简介", 
-             "c": ("迪杰斯特拉算法（Dijkstra's Algorithm）是由荷兰计算机科学家艾兹赫尔·戴克斯特拉在 1956 年提出的一种单源最短路径算法。\n\n"
-                  "该算法的核心思想是贪心策略，每次都选择当前已知距离源点最近的一个节点，并以此节点为基准去更新它相邻节点的距离，从而在一个包含多个节点和带有非负权重边的图中，找到从一个指定的“源点”到图中所有其他节点的最短距离。\n\n"
-                  "我们将以下图为例，学习应用该算法。"), 
-             "img": "assets/dijkstra_demo1.png"},
-             {"t": "启发式搜索", "c": "A* 引入了 h(n) 预估代价。", "img": "🔍"}
+            {
+                "t": "算法简介", 
+                "c": ("迪杰斯特拉算法（Dijkstra's Algorithm）是由荷兰计算机科学家艾兹赫尔·戴克斯特拉在 1956 年提出的一种单源最短路径算法。\n\n"
+                      "该算法的核心思想是贪心策略，每次都选择当前已知距离源点最近的一个节点，并以此节点为基准去更新它相邻节点的距离。\n\n"
+                      "我们将以下图为例，学习应用该算法。"), 
+                "img": "assets/dijkstra_demo1.png"
+            },
+            {"t": "寻找最短路径", "c": "从起点开始，不断更新邻接节点的距离...", "img": "🔍"}
         ]
     }
 
@@ -127,51 +129,54 @@ elif st.session_state.page == "learning":
         
     data = steps[algo][st.session_state.step]
 
-    # 3. 渲染当前步骤
-    st.subheader(f"正在学习: {algo}")
+    # --- 1. 顶部标题 ---
+    st.subheader(f"📖 正在学习: {algo}")
     st.divider()
 
-    col1, col2 = st.columns([3, 2])
+    # --- 2. 文字内容 (全宽显示) ---
+    st.header(data['t'])
+    st.write(data['c'])
+
+    # --- 3. 图片/表情居中处理 ---
+    st.write("") # 添加一点点间距
+    img_path = data['img']
     
-    with col1:
-        st.header(data['t'])
-        st.write(data['c'])
-    
-    with col2:
-        img_path = data['img']
-        # 优化判断逻辑
-        if "/" in img_path or img_path.endswith(('.png', '.jpg', '.jpeg')):
+    if "/" in img_path or img_path.endswith(('.png', '.jpg', '.jpeg')):
+        # 通过 [1, 4, 1] 比例实现水平居中
+        _, center_col, _ = st.columns([1, 6, 1]) 
+        with center_col:
             try:
                 st.image(img_path, use_container_width=True)
-            except Exception as e:
-                st.error(f"图片加载失败，请检查 GitHub 仓库中是否存在: {img_path}")
-        else:
-            # 如果是表情符号
-            st.markdown(f"<h1 style='text-align: center; font-size: 100px;'>{img_path}</h1>", unsafe_allow_html=True)
+            except Exception:
+                st.error(f"图片加载失败，请检查路径: {img_path}")
+    else:
+        # 如果是表情符号，居中放大显示
+        st.markdown(f"<h1 style='text-align: center; font-size: 100px;'>{img_path}</h1>", unsafe_allow_html=True)
 
     st.divider()
 
-    # 4. 底部导航按钮
+    # --- 4. 底部导航按钮 ---
     col_l, col_m, col_r = st.columns([1, 1, 1])
     with col_l:
         if st.session_state.step > 0:
-            if st.button("⬅️ 上一步"):
+            if st.button("⬅️ 上一步", use_container_width=True):
                 st.session_state.step -= 1
                 st.rerun()
     
     with col_r:
         if st.session_state.step < len(steps[algo]) - 1:
-            if st.button("下一步 ➡️"):
+            if st.button("下一步 ➡️", use_container_width=True):
                 st.session_state.step += 1
                 st.rerun()
         elif algo not in st.session_state.learned_modules:
-            if st.button("🏁 知识检验"):
+            if st.button("🏁 知识检验", color="primary", use_container_width=True):
                 st.session_state.page = "learning_test"
                 st.rerun()
         else:
-            if st.button("🏠 返回首页"):
+            if st.button("🏠 返回首页", use_container_width=True):
                 st.session_state.page = "dashboard"
                 st.rerun()
+                
 # --- 4. 知识检验 ---
 elif st.session_state.page == "learning_test":
     st.header("🎯 知识检验")
