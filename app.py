@@ -64,7 +64,7 @@ def generate_dijkstra_steps():
         curr = min(unvisited, key=lambda n: dist[n])
         if dist[curr] == float('inf'): break
         
-        step_explanation = f"**当前步骤**：从所有未访问节点中，选择距离最小的节点 **{curr}**（当前距离为 {dist[curr]}）。"
+        step_explanation = f"从所有未访问节点中，选择距离最小的节点 **{curr}**（当前距离为 {dist[curr]}）。"
         update_logs = []
 
         # 遍历邻居进行松弛操作
@@ -89,7 +89,7 @@ def generate_dijkstra_steps():
         unvisited.remove(curr)
 
         all_steps.append({
-            "t": f"处理节点 {curr}",
+            "t": f"分布学习--处理节点 {curr}",
             "explanation": f"正在从节点 {curr} 向外探索邻居。",
             "c": step_explanation + "\n\n" + ("\n".join([f"- {log}" for log in update_logs])),
             "type": "interactive_demo",
