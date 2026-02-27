@@ -206,9 +206,7 @@ def generate_Astar_full_steps():
         "1. **曼哈顿距离 (Manhattan Distance)**：适用于只能在网格中水平或垂直移动的场景。\n"
         "公式：$h(n) = |x_n - x_{goal}| + |y_n - y_{goal}|$\n\n"
         "2. **欧几里得距离 (Euclidean Distance)**：适用于可以沿任意角度直线移动的场景。\n"
-        "公式：$h(n) = \sqrt{(x_n - x_{goal})^2 + (y_n - y_{goal})^2}$\n\n"
-        "3. **切比雪夫距离 (Chebyshev Distance)**：适用于允许对角线移动且代价与水平垂直移动相同的场景（如国际象棋的王）。\n"
-        "公式：$h(n) = \max(|x_n - x_{goal}|, |y_n - y_{goal}|)$"),
+        "公式：$h(n) = \sqrt{(x_n - x_{goal})^2 + (y_n - y_{goal})^2}$\n\n"),
     })
 
     all_steps.append({
