@@ -278,7 +278,7 @@ def generate_Astar_full_steps():
                     f_val = tentative_g + heuristic(neighbor, goal)
                     open_list[neighbor] = f_val
                     parent[neighbor] = curr
-                    update_logs.append(f"发现节点 {neighbor}: $g={tentative_g}, h={heuristic(neighbor, goal)}, f={f_val}$")
+                    update_logs.append(f"发现节点 {neighbor}: $g={tentative_g}, h={heuristic(neighbor, goal)}, f={f_val}$\n")
 
         all_steps.append({
             "t": f"正在探索节点 {curr}",
