@@ -349,10 +349,18 @@ if st.session_state.page == "login":
             # 登录时从云端同步该学生的旧积分
             df = get_data()
             if name in df["学生"].values:
-                st.session_state.score = int(df[df["学生"] == name]["总积分"].iloc[0])
+                user_row = df[df["学生"] == name].iloc[0]
+                st.session_state.score = int(user_row["总积分"])
+                learned = set()
+                if user_row.get("Dijkstra_已完成") == True: learned.add("Dijkstra")
+                if user_row.get("AStar_已完成") == True: learned.add("AStar")
+                st.session_state.learned_modules = learned
             else:
                 # 新学生自动注册
-                new_user = pd.DataFrame([{"学生": name, "总积分": 0}])
+                new_user = pd.DataFrame([{"学生": name, 
+                    "总积分": 0, 
+                    "Dijkstra_已完成": False, 
+                    "AStar_已完成": False}])
                 save_data(pd.concat([df, new_user], ignore_index=True))
             st.session_state.page = "dashboard"
             st.rerun()
@@ -552,13 +560,19 @@ elif st.session_state.page == "learning_test":
             is_correct = any(ans.strip().lower() == user_ans.strip().lower() for ans in correct_ans)
             
             if is_correct:
-                st.success("🎉 正确！")
+                st.success("🎉 正确！积分 +50")
                 st.session_state.learned_modules.add(algo)
                 st.session_state.score += 50  # 假设给 50 分
                 # 同步到云端
                 df = get_data()
-                df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
-                save_data(df)
+                idx = df[df["学生"] == st.session_state.user].index
+                if not idx.empty:
+                    df.loc[idx, "总积分"] = st.session_state.score
+                    # 动态更新对应的算法列
+                    column_name = f"{algo}_已完成"
+                    if column_name in df.columns:
+                        df.loc[idx, column_name] = True
+                    save_data(df)
                 st.balloons()
                 time.sleep(1)
                 st.rerun()
