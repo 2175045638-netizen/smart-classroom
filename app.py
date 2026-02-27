@@ -191,7 +191,7 @@ def generate_Astar_full_steps():
     all_steps.append({
         "t": "算法简介", 
         "c": ("A-star（A*）算法是一种经典的启发式搜索算法，用来在图或状态空间中找到从起点到终点的代价最小路径。它结合了Dijkstra算法和贪心算法的优点，通过启发式函数在保证最优解的同时提高搜索效率。\n\n"
-              "A*算法的目标是找到从起点到终点的最短路径。其通过维护一个优先队列（最小堆），根据##估价函数##$f(n)$来选择下一步要探索的节点，其中估价函数由两部分组成：\n\n"
+              "A*算法的目标是找到从起点到终点的最短路径。其通过维护一个优先队列（最小堆），根据估价函数$f(n)$来选择下一步要探索的节点，其中估价函数由两部分组成：\n\n"
               "实际代价$g(n)$：从起点到当前节点$n$的已知路径代价（已经走了多少步）。\n\n"
               "启发式代价$h(n)$：从当前节点$n$到终点的估计代价（预测还要多少步到达终点）。\n\n"
               "因此，总估价函数表达为： $f(n) = g(n) + h(n)$\n\n"
@@ -294,8 +294,8 @@ def render_astar_snapshot(snapshot):
                 h = abs(r - goal[0]) + abs(c - goal[1]) # 曼哈顿距离
                 f = g + h
                 # 在方块中心标注 f 值
-                ax.text(c, r, f'f:{f}', ha='center', va='center', 
-                        color='blue', fontsize=8, fontweight='bold')
+                ax.text(c, r, f'f:{f}={g}+{h}', ha='center', va='center', 
+                        color='blue', fontsize=6, fontweight='bold')
             
             # 绘制节点颜色
             if pos in snapshot["closed"]:
