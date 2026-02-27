@@ -421,10 +421,9 @@ with st.sidebar:
                     supabase.table("quiz_sessions").update({
                         "ended_at": time.strftime("%Y-%m-%d %H:%M:%S")
                     }).eq("id", session_id).execute()
-                # 将状态设为 idle (闲置)
                 state_df.loc[state_df['key'] == 'quiz_status', 'value'] = 'idle'
-                # 清空当前主题
                 state_df.loc[state_df['key'] == 'current_topic', 'value'] = 'None'
+                state_df.loc[state_df['key'] == 'current_session_id', 'value'] = "closed" 
                 update_system_state(state_df)
                 st.toast("答题通道已关闭")
                 st.rerun()
@@ -513,10 +512,12 @@ elif st.session_state.page == "dashboard":
             st.warning("你已完成本场测试，无法重复作答。")
         else:
             if st.button("开始进入答题模式", use_container_width=True):
-                st.session_state.page = "quiz"
                 st.session_state.quiz_step = 0
                 st.session_state.quiz_score = 0
+                st.session_state.quiz_settled = False
                 st.session_state.current_session_id = session_id
+                
+                st.session_state.page = "quiz"
                 st.rerun()
     else:
         # 当状态为 idle 或 ended 时
@@ -698,6 +699,22 @@ elif st.session_state.page == "learning_test":
 
 # 随堂测试
 elif st.session_state.page == "quiz":
+    sys_state = get_system_state()
+    current_session_id = safe_get_value(sys_state, "current_session_id", None)
+    
+    # 检查数据库：该学生是否已经在当前这一轮提交过成绩
+    check_done = supabase.table("quiz_results")\
+        .select("id")\
+        .eq("session_id", current_session_id)\
+        .eq("student_name", st.session_state.user)\
+        .execute()
+
+    if check_done.data:
+        st.warning("本轮测试你已提交")
+        if st.button("返回主页"):
+            st.session_state.page = "dashboard"
+            st.rerun()
+        st.stop() # 停止渲染后续题目
     if "last_refresh" not in st.session_state: 
         st.session_state.last_refresh = time.time()
     if time.time() - st.session_state.last_refresh > 2:
