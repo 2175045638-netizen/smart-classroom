@@ -15,7 +15,7 @@ conn_control = st.connection("gsheets_control", type=GSheetsConnection)
 
 def get_student_data():
     # 默认读取该文件的第一个工作表
-    return conn_data.read(ttl=0)
+    return conn_data.read(ttl=1)
 
 def save_student_data(df):
     conn_data.update(data=df)
@@ -24,7 +24,7 @@ def save_student_data(df):
 # 操作【答题状态控制】表的函数
 def get_system_state():
     # 假设你的状态数据在名为 "Sheet1" 的工作表里
-    return conn_control.read(ttl=0)
+    return conn_control.read(ttl=1)
 
 def update_system_state(df):
     conn_control.update(data=df)
