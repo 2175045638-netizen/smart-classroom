@@ -48,16 +48,14 @@ def generate_dijkstra_steps():
         "t": "算法简介", 
         "c": ("迪杰斯特拉算法（Dijkstra's Algorithm）是由荷兰计算机科学家艾兹赫尔·戴克斯特拉在 1956 年提出的一种单源最短路径算法。\n\n"
               "该算法的核心思想是贪心策略，即每次都选择当前已知距离源点最近的一个节点，并以此为基准更新其邻居的距离。\n\n"
-              "接下来，我们将通过分步交互演示来观察这一过程。"), 
-        "img": "assets/dijkstra_demo1.png", # 这里放你原本的简介图片路径
-        "explanation": "概览：Dijkstra 适用于边权为非负数的图。"
+              "接下来，我们将通过分步演示来学习这一过程。"), 
+        "img": "assets/dijkstra_demo1.png" # 这里放你原本的简介图片路径
     })
     
     # 初始状态快照
     all_steps.append({
         "t": "准备阶段",
         "c": "算法开始，起点 0 距离设为 0，其余设为无穷大。",
-        "explanation": "此时尚未开始探索",
         "type": "interactive_demo",
         "snapshot": {"dist_form": dist_formula.copy(), "prev": prev.copy(), "visited": visited.copy(), "curr": None}
     })
@@ -92,8 +90,8 @@ def generate_dijkstra_steps():
 
         all_steps.append({
             "t": f"处理节点 {curr}",
-            "c": f"正在从节点 {curr} 向外探索邻居。",
-            "explanation": step_explanation + "\n\n" + ("\n".join([f"- {log}" for log in update_logs])),
+            "explanation": f"正在从节点 {curr} 向外探索邻居。",
+            "c": step_explanation + "\n\n" + ("\n".join([f"- {log}" for log in update_logs])),
             "type": "interactive_demo",
             "snapshot": {"dist_form": dist_formula.copy(), "prev": prev.copy(), "visited": visited.copy(), "curr": curr}
         })
