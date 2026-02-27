@@ -452,12 +452,6 @@ elif st.session_state.page == "learning":
             st.write(data['c'])
             
     else:
-        # 普通图文/简介模式
-        #img_path = data.get('img', "💡")
-        #if "/" in str(img_path) or str(img_path).endswith(('.png', '.jpg')):
-            #st.image(img_path, use_container_width=True)
-        #else:
-            #st.markdown(f"<h1 style='text-align:center; font-size:80px;'>{img_path}</h1>", unsafe_allow_html=True)
         st.write(data['c'])
 
     st.divider()
@@ -526,7 +520,6 @@ elif st.session_state.page == "learning_test":
             
         elif algo == "AStar":
             options = [
-                "请选择一个选项",
                 "从起点到当前节点的实际代价", 
                 "从当前节点到终点的预估代价", 
                 "算法运行的总步数"
