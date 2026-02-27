@@ -6,6 +6,20 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
 
+# --- 题目数据库定义 ---
+QUIZ_BANK = {
+    "迪杰斯特拉算法": [
+        {"type": "choice", "q": "Dijkstra 算法的核心思想是什么？", "options": ["贪心", "动态规划", "回溯"], "a": "贪心", "pts": 30},
+        {"type": "choice", "q": "Dijkstra 能处理含有负权边的图吗？", "options": ["能", "不能"], "a": "不能", "pts": 30},
+        {"type": "input", "q": "若起点到A距离为5，A到B边权为3，则更新后起点到B距离为？", "a": "8", "pts": 40}
+    ],
+    "A*算法": [
+        {"type": "choice", "q": "A* 算法中的 h(n) 代表什么？", "options": ["实际代价", "启发式预估代价", "总代价"], "a": "启发式预估代价", "pts": 30},
+        {"type": "input", "q": "A* 算法的公式是 f = g + ?", "a": "h", "pts": 30},
+        {"type": "choice", "q": "如果 h(n) 始终为 0，A* 退化为什么算法？", "options": ["BFS", "Dijkstra", "DFS"], "a": "Dijkstra", "pts": 40}
+    ]
+}
+
 # --- 0. 数据库连接与初始化 ---
 # 在 Streamlit Cloud 的 Secrets 中配置表格链接
 conn_data = st.connection("gsheets_data", type=GSheetsConnection)
@@ -357,26 +371,23 @@ with st.sidebar:
         # 注意：这里需要指定对应的 worksheet 名称
         state_df = conn_control.read(ttl=60)
 
-        c1, c2, c3 = st.columns(3)
+        # 选择主题
+        selected_topic = st.selectbox("选择本次答题主题", list(QUIZ_BANK.keys()))
     
-        with c1:
+        col_admin1, col_admin2 = st.columns(2)
+        with col_admin1:
             if st.button("🚩 发布主题"):
                 state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'ready'
+                state_df.loc[state_df['Key'] == 'current_topic', 'Value'] = selected_topic
                 update_system_state(state_df)
-                st.toast("已切换至等待模式")
-        with c2:
-            if st.button("🚀 开始计时"):
+                st.success(f"已发布: {selected_topic}")
+            
+        with col_admin2:
+            if st.button("🚀 开始答题"):
                 state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'started'
-                # 记录全员统一的开始时间
                 state_df.loc[state_df['Key'] == 'start_time', 'Value'] = str(time.time())
                 update_system_state(state_df)
-                st.toast("全员开始答题！")
-
-        with c3:
-            if st.button("🛑 结束答题"):
-                state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'ended'
-                update_system_state(state_df)
-                st.toast("答题已关闭")
+                st.toast("全员计时开始！")
 
 # --- 1. 登录页面 ---
 if st.session_state.page == "login":
@@ -618,22 +629,62 @@ elif st.session_state.page == "learning_test":
                 st.session_state.last_result = "wrong"
                 st.rerun() # 必须 rerun 才能看到错误提示
 
-# --- 5. 课堂答题 (锁定模式) ---
 elif st.session_state.page == "quiz":
-    elapsed = time.time() - st.session_state.start_time
-    remaining = max(0, int(60 - elapsed))
-    st.error(f"⏱️ 剩余时间: {remaining} 秒")
-    if remaining <= 0: st.session_state.page = "result"; st.rerun()
+    # 1. 获取云端最新状态
+    sys_state = get_system_state()
+    status = sys_state.loc[sys_state['Key'] == 'quiz_status', 'Value'].values[0]
+    topic = sys_state.loc[sys_state['Key'] == 'current_topic', 'Value'].values[0]
+    
+    # 2. 获取当前主题的题目列表
+    questions = QUIZ_BANK.get(topic, [])
+    total_q = len(questions)
 
-    if st.session_state.quiz_step == 1:
-        ans = st.selectbox("Dijkstra 一定能找到最短路径？", ["请选择", "是", "否"])
-        if st.button("下一题") and ans != "请选择":
-            if ans == "是": st.session_state.quiz_score += int(20 + remaining/2)
-            st.session_state.quiz_step = 2; st.rerun()
-    else:
-        ans = st.text_input("A* 公式？")
-        if st.button("提交结果"):
-            if "f=g+h" in ans.lower().replace(" ",""): st.session_state.quiz_score += int(20 + remaining/2)
+    st.title(f"✍️ 课堂测试：{topic}")
+
+    if status == "ready":
+        st.info("🎯 答题主题已就绪，请等待老师点击『开始答题』...")
+        if st.button("刷新状态"): st.rerun()
+
+    elif status == "started":
+        # 计算统一时间
+        global_start = float(sys_state.loc[sys_state['Key'] == 'start_time', 'Value'].values[0])
+        elapsed = time.time() - global_start
+        remaining = max(0, int(120 - elapsed)) # 假设总时长120秒
+        
+        if remaining <= 0:
+            st.warning("⏳ 时间到！正在自动结算...")
+            st.session_state.page = "result"; st.rerun()
+
+        st.error(f"⏱️ 全班统一倒计时：{remaining} 秒")
+        
+        # 3. 动态渲染当前题目
+        current_q_idx = st.session_state.get('quiz_step', 0)
+        
+        if current_q_idx < total_q:
+            q_data = questions[current_q_idx]
+            st.markdown(f"### 第 {current_q_idx + 1} 题 / 共 {total_q} 题")
+            st.write(q_data['q'])
+
+            # 根据题目类型显示不同组件
+            if q_data['type'] == "choice":
+                ans = st.radio("选择答案", q_data['options'], key=f"q_{current_q_idx}")
+            else:
+                ans = st.text_input("填写答案", key=f"q_{current_q_idx}")
+
+            if st.button("确认提交本题"):
+                # 判定对错
+                if str(ans).strip().lower() == str(q_data['a']).strip().lower():
+                    st.session_state.quiz_score += q_data['pts']
+                
+                # 下一步
+                if current_q_idx + 1 < total_q:
+                    st.session_state.quiz_step = current_q_idx + 1
+                else:
+                    # 全部答完，记录完成时间
+                    st.session_state.finish_time = elapsed
+                    st.session_state.page = "result"
+                st.rerun()
+        else:
             st.session_state.page = "result"; st.rerun()
 
 # --- 6. 结果与排行榜 ---
