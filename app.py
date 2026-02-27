@@ -74,9 +74,9 @@ def generate_dijkstra_steps():
                     dist_formula[nbr] = f"{dist[curr]} + {weight} = {new_val}"
                     dist[nbr] = new_val
                     prev[nbr] = curr
-                    update_logs.append(f"节点 {nbr}: 发现更短路径！ {old_dist_str} > {dist_formula[nbr]}")
+                    update_logs.append(f"节点 {nbr}: 更新表格，因为发现更短路径： {old_dist_str} > {dist_formula[nbr]}")
                 else:
-                    update_logs.append(f"节点 {nbr}: 维持现状。现有距离 {dist[nbr]} <= 尝试路径 ({dist[curr]} + {weight})")
+                    update_logs.append(f"节点 {nbr}: 维持现状，因为现有距离 {dist[nbr]} <= 尝试路径 ({dist[curr]} + {weight})")
 
         visited[curr] = True
         unvisited.remove(curr)
