@@ -502,7 +502,7 @@ elif st.session_state.page == "dashboard":
         already_done = False
         if session_id:
             result = supabase.table("quiz_results")\
-                .select("*")\
+                .select("id")\
                 .eq("session_id", session_id)\
                 .eq("student_name", st.session_state.user)\
                 .execute()
@@ -513,8 +513,6 @@ elif st.session_state.page == "dashboard":
             st.warning("你已完成本场测试，无法重复作答。")
         else:
             if st.button("开始进入答题模式", use_container_width=True):
-                st.session_state.quiz_settled = False
-                st.session_state.finish_time = 0
                 st.session_state.page = "quiz"
                 st.session_state.quiz_step = 0
                 st.session_state.quiz_score = 0
@@ -778,7 +776,7 @@ elif st.session_state.page == "result":
 
         if session_id:
             existing = supabase.table("quiz_results")\
-                .select("*")\
+                .select("id")\
                 .eq("session_id", session_id)\
                 .eq("student_name", st.session_state.user)\
                 .execute()
@@ -800,7 +798,6 @@ elif st.session_state.page == "result":
         st.session_state.quiz_settled = True
 
     if st.button("返回主页"):
-        st.session_state.quiz_settled = False
         st.session_state.quiz_score = 0
         st.session_state.quiz_step = 0
         st.session_state.page = "dashboard"
