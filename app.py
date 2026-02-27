@@ -342,7 +342,6 @@ elif st.session_state.page == "learning_test":
     # 使用容器包裹题目，视觉上更整洁
     with st.container():
         if algo == "Dijkstra":
-            st.write(" **Dijkstra 算法** 测验：")
             q_input = st.text_input("如图，这是一个有向加权图，权重代表两点之间的距离。请使用 Dijkstra 算法，计算出从A点到F点的最短路径。（输入示例：D->F->E）")
             # --- 新增：图片居中显示 ---
             st.write("") # 增加一点间距
