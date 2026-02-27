@@ -440,15 +440,14 @@ elif st.session_state.page == "dashboard":
         current_status = 'idle'
 
     st.title(f"你好, {st.session_state.user}")
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
         st.metric("我的当前积分", st.session_state.score)
     with col2:
         if st.button("查看班级排行榜"):
             st.session_state.page = "leaderboard"
             st.rerun()
-    with col3:
-        if st.button("刷新状态"): st.rerun()
+    if st.button("刷新状态"): st.rerun()
 
     st.subheader("课程知识")
     with st.expander("路径规划算法板块", expanded=True):
