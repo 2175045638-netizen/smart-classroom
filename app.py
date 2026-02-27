@@ -43,12 +43,21 @@ def generate_dijkstra_steps():
     unvisited = list(range(9))
     
     all_steps = []
+
+    all_steps.append({
+        "t": "算法简介", 
+        "c": ("迪杰斯特拉算法（Dijkstra's Algorithm）是由荷兰计算机科学家艾兹赫尔·戴克斯特拉在 1956 年提出的一种单源最短路径算法。\n\n"
+              "该算法的核心思想是贪心策略，即每次都选择当前已知距离源点最近的一个节点，并以此为基准更新其邻居的距离。\n\n"
+              "接下来，我们将通过分步交互演示来观察这一过程。"), 
+        "img": "assets/dijkstra_demo1.png", # 这里放你原本的简介图片路径
+        "explanation": "概览：Dijkstra 适用于边权为非负数的图。"
+    })
     
     # 初始状态快照
     all_steps.append({
         "t": "准备阶段",
         "c": "算法开始，起点 0 距离设为 0，其余设为无穷大。",
-        "explanation": "此时尚未开始探索，Visit 集合为空。",
+        "explanation": "此时尚未开始探索",
         "type": "interactive_demo",
         "snapshot": {"dist_form": dist_formula.copy(), "prev": prev.copy(), "visited": visited.copy(), "curr": None}
     })
@@ -261,7 +270,7 @@ elif st.session_state.page == "learning":
     data = steps[algo][st.session_state.step]
 
     # --- 渲染逻辑 (保持你原来的代码不变) ---
-    st.subheader(f"📖 正在学习: {algo}")
+    st.subheader(f"正在学习: {algo}")
     st.divider()
 
     st.header(data['t'])
