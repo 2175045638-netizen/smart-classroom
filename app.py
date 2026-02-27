@@ -338,11 +338,16 @@ elif st.session_state.page == "learning":
 elif st.session_state.page == "learning_test":
     algo = st.session_state.current_algo
     st.header(f"知识检验: {algo}")
+
+    user_ans = ""
+    correct_ans = []
+    is_text_input = False# 标记是否为问答题
     
     # 使用容器包裹题目，视觉上更整洁
     with st.container():
         if algo == "Dijkstra":
-            q_input = st.text_input("如图，这是一个有向加权图，权重代表两点之间的距离。请使用 Dijkstra 算法，计算出从A点到F点的最短路径。（输入示例：D->F->E）")
+            q = st.text_input("如图，这是一个有向加权图，权重代表两点之间的距离。请使用 Dijkstra 算法，计算出从A点到F点的最短路径。（输入示例：D->F->E）")
+            user_ans = q
             # --- 新增：图片居中显示 ---
             st.write("") # 增加一点间距
             # 创建三列，比例为 1:2:1
@@ -352,11 +357,10 @@ elif st.session_state.page == "learning_test":
                 st.image("assets/d_test1.png", 
                          caption="题目示意图", 
                          use_container_width=True)
-            
-            correct_ans = "A->B->D->F"
+            is_text_input = True
+            correct_ans = ["A->B->D->F"]
             
         elif algo == "AStar":
-            st.write("针对 **A* 算法** 的小测验：")
             q = st.radio(
                 "A* 算法的代价函数 f(n) = g(n) + h(n) 中，h(n) 代表什么？",
                 [
@@ -366,35 +370,51 @@ elif st.session_state.page == "learning_test":
                     "算法运行的总步数"
                 ]
             )
-            correct_ans = "从当前节点到终点的预估代价"
+            user_ans = q
+            correct_ans = ["从当前节点到终点的预估代价"]
+            is_text_input = False
 
     st.divider()
 
     # 提交逻辑
-    if st.button("提交答案", use_container_width=True):
-        if q == "请选择一个选项":
-            st.warning("请先选择一个答案再提交哦！")
-        elif q == correct_ans:
+    if st.button("确认提交", use_container_width=True):
+        # 1. 空值检查
+        if user_ans == "" or user_ans == "请选择":
+            st.warning("⚠️ 请先完成题目再提交！")
+            st.stop()
+
+        # 2. 格式化处理
+        if is_text_input:
+            # 问答题：去空格、转小写进行模糊匹配
+            final_user_ans = user_ans.strip().lower().replace(" ", "")
+            is_correct = any(final_user_ans == str(c).lower().replace(" ", "") for c in correct_ans_list)
+        else:
+            # 选择题：直接比对
+            is_correct = (user_ans in correct_ans)
+
+        # 3. 结果反馈
+        if is_correct:
             st.balloons()
-            st.success("回答正确！太棒了 🎉")
+            st.success("🎉 回答正确！积分 +50")
             
-            # 只有第一次通过该模块才加分（可选逻辑）
+            # 积分同步逻辑
             if algo not in st.session_state.learned_modules:
                 st.session_state.score += 50
                 st.session_state.learned_modules.add(algo)
-                
-                # 同步到云端
-                df = get_data()
-                df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
-                save_data(df)
-                st.info("积分 +50，已同步到云端！")
+                # 更新云端数据
+                try:
+                    df = get_data()
+                    df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
+                    save_data(df)
+                except:
+                    st.error("云端同步失败，请检查网络")
             
             time.sleep(2)
             st.session_state.page = "dashboard"
             st.rerun()
         else:
-            st.error("答案错误，再温习一下算法过程吧！")
-            if st.button("返回学习"):
+            st.error("答案有误，请再思考一下，或者返回重新学习。")
+            if st.button("重新看一遍教程"):
                 st.session_state.step = 0
                 st.session_state.page = "learning"
                 st.rerun()
