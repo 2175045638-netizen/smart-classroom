@@ -451,14 +451,14 @@ elif st.session_state.page == "learning":
             st.write("**算法日志:**")
             st.write(data['c'])
             
-    else:
+    #else:
         # 普通图文/简介模式
-        img_path = data.get('img', "💡")
-        if "/" in str(img_path) or str(img_path).endswith(('.png', '.jpg')):
-            st.image(img_path, use_container_width=True)
-        else:
-            st.markdown(f"<h1 style='text-align:center; font-size:80px;'>{img_path}</h1>", unsafe_allow_html=True)
-        st.write(data['c'])
+        #img_path = data.get('img', "💡")
+        #if "/" in str(img_path) or str(img_path).endswith(('.png', '.jpg')):
+            #st.image(img_path, use_container_width=True)
+        #else:
+            #st.markdown(f"<h1 style='text-align:center; font-size:80px;'>{img_path}</h1>", unsafe_allow_html=True)
+        #st.write(data['c'])
 
     st.divider()
 
