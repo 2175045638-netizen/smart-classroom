@@ -336,103 +336,110 @@ elif st.session_state.page == "learning":
         # ... 这里的知识检验/返回首页逻辑保持不变 ...
 
 # --- 4. 知识检验 ---
+# --- 4. 知识检验 ---
 elif st.session_state.page == "learning_test":
     algo = st.session_state.current_algo
-    
-
     is_completed = algo in st.session_state.learned_modules
     
-    st.header(f"{'查看题目' if is_completed else '知识检验'}: {algo}")
+    st.header(f"{'👁️ 查看题目' if is_completed else '🎯 知识检验'}: {algo}")
     if is_completed:
         st.success("提示：你已通过此项测验，当前为查看模式（已显示正确答案）。")
 
     user_ans = ""
-    correct_ans = []
-    is_text_input = False# 标记是否为问答题
+    correct_ans = [] # 统一初始化为列表，方便后续 any() 遍历
+    is_text_input = False 
     
-    # 使用容器包裹题目，视觉上更整洁
     with st.container():
         if algo == "Dijkstra":
-            st.write("如图，这是一个有向加权图，权重代表两点之间的距离。请使用 Dijkstra 算法，计算出从A点到F点的最短路径。（输入示例：D->F->E）")
-            correct_ans = "A->B->D->F"
-            q = st.text_input(
-                value=correct_ans if is_completed else "", 
-                disabled=is_completed)
-            user_ans = q
-            # --- 新增：图片居中显示 ---
-            st.write("") # 增加一点间距
-            # 创建三列，比例为 1:2:1
-            img_col1, img_col2, img_col3 = st.columns([1, 2, 1])
-            with img_col2:
-                # 替换为你想要显示的图片路径或 URL
-                st.image("assets/d_test1.png", 
-                         caption="题目示意图", 
-                         use_container_width=True)
-            is_text_input = True
-            correct_ans = ["A->B->D->F"]
+            st.write("如图，这是一个有向加权图，权重代表两点之间的距离。请使用 Dijkstra 算法，计算出从A点到F点的最短路径。")
             
-        elif algo == "AStar":
-            q = st.radio(
-                "A* 算法的代价函数 f(n) = g(n) + h(n) 中，h(n) 代表什么？",
-                [
-                    "请选择一个选项",
-                    "从起点到当前节点的实际代价", 
-                    "从当前节点到终点的预估代价", 
-                    "算法运行的总步数"
-                ]
+            # 修正点1：统一正确答案变量
+            # 这里的正确答案既用于填入输入框，也用于后续判定
+            ans_str = "A->B->D->F"
+            correct_ans = [ans_str] 
+            
+            q = st.text_input(
+                "请输入路径 (示例: D->F->E):", # 添加 Label
+                value=ans_str if is_completed else "", 
+                disabled=is_completed
             )
             user_ans = q
-            correct_ans = "从当前节点到终点的预估代价"
+            
+            # 图片居中显示
+            st.write("") 
+            img_col1, img_col2, img_col3 = st.columns([1, 2, 1])
+            with img_col2:
+                st.image("assets/d_test1.png", caption="题目示意图", use_container_width=True)
+            
+            is_text_input = True
+            
+        elif algo == "AStar":
+            options = [
+                "请选择一个选项",
+                "从起点到当前节点的实际代价", 
+                "从当前节点到终点的预估代价", 
+                "算法运行的总步数"
+            ]
+            # 修正点2：查看模式下自动选中正确项
+            correct_str = "从当前节点到终点的预估代价"
+            correct_ans = [correct_str]
+            
+            default_index = options.index(correct_str) if is_completed else 0
+            
+            q = st.radio(
+                "A* 算法的代价函数 f(n) = g(n) + h(n) 中，h(n) 代表什么？",
+                options,
+                index=default_index,
+                disabled=is_completed
+            )
+            user_ans = q
             is_text_input = False
 
     st.divider()
 
     # 提交逻辑
     if is_completed:
-        # 已完成模式：只显示返回按钮
         if st.button("返回主页", use_container_width=True):
             st.session_state.page = "dashboard"
             st.rerun()
     else:
-        # 未完成模式：显示提交逻辑
         if st.button("确认提交", use_container_width=True):
             # 1. 空值检查
-            if user_ans == "" or user_ans == "请选择":
+            if user_ans == "" or user_ans == "请选择一个选项":
                 st.warning("⚠️ 请先完成题目再提交！")
                 st.stop()
 
-            # 2. 格式化处理
+            # 2. 格式化处理判定
             if is_text_input:
-            # 问答题：去空格、转小写进行模糊匹配
-                final_user_ans = user_ans.strip().lower().replace(" ", "")
-                is_correct = any(final_user_ans == str(c).lower().replace(" ", "") for c in correct_ans)
+                # 问答题：去空格、转大写进行模糊匹配
+                final_user_ans = user_ans.strip().upper().replace(" ", "")
+                is_correct = any(final_user_ans == str(c).strip().upper().replace(" ", "") for c in correct_ans)
             else:
-            # 选择题：直接比对
-                is_correct = (user_ans == correct_ans)
+                # 选择题：直接比对是否在列表内
+                is_correct = (user_ans in correct_ans)
 
             # 3. 结果反馈
             if is_correct:
                 st.balloons()
                 st.success("🎉 回答正确！积分 +50")
-            
-                # 积分同步逻辑
+                
                 if algo not in st.session_state.learned_modules:
                     st.session_state.score += 50
                     st.session_state.learned_modules.add(algo)
-                    # 更新云端数据
                     try:
                         df = get_data()
                         df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
                         save_data(df)
                     except:
                         st.error("云端同步失败，请检查网络")
-            
+                
                 time.sleep(2)
                 st.session_state.page = "dashboard"
                 st.rerun()
             else:
-                st.error("答案有误，请再思考一下，或者返回重新学习。")
-                if st.button("重新看一遍教程"):
+                st.error("答案有误，请再思考一下。")
+                # 修正点3：增加 key 防止 button 重名冲突
+                if st.button("重新看一遍教程", key="relearn_btn"):
                     st.session_state.step = 0
                     st.session_state.page = "learning"
                     st.rerun()
