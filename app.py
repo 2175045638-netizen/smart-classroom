@@ -650,12 +650,19 @@ elif st.session_state.page == "learning_test":
 
 # 随堂测试
 elif st.session_state.page == "quiz":
+    if "quiz_step" not in st.session_state:
+        st.session_state.quiz_step = 0
+
+    if "quiz_score" not in st.session_state:
+        st.session_state.quiz_score = 0
+    if "finish_time" not in st.session_state:
+        st.session_state.finish_time = 0
     if "last_refresh" not in st.session_state:
         st.session_state.last_refresh = time.time()
-
     if time.time() - st.session_state.last_refresh > 2:
         st.session_state.last_refresh = time.time()
         st.rerun()
+
     sys_state = get_system_state()
 
     status = safe_get_value(sys_state, "quiz_status", "idle")
