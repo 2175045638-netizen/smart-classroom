@@ -339,7 +339,7 @@ elif st.session_state.page == "learning":
 # --- 4. 知识检验 ---
 elif st.session_state.page == "learning_test":
     algo = st.session_state.current_algo
-    st.header(f"知识检验: {algo}")
+    
 
     is_completed = algo in st.session_state.learned_modules
     
@@ -354,7 +354,11 @@ elif st.session_state.page == "learning_test":
     # 使用容器包裹题目，视觉上更整洁
     with st.container():
         if algo == "Dijkstra":
-            q = st.text_input("如图，这是一个有向加权图，权重代表两点之间的距离。请使用 Dijkstra 算法，计算出从A点到F点的最短路径。（输入示例：D->F->E）")
+            st.write("如图，这是一个有向加权图，权重代表两点之间的距离。请使用 Dijkstra 算法，计算出从A点到F点的最短路径。（输入示例：D->F->E）")
+            correct_ans = "A->B->D->F"
+            q = st.text_input(
+                value=correct_ans if is_completed else "", 
+                disabled=is_completed)
             user_ans = q
             # --- 新增：图片居中显示 ---
             st.write("") # 增加一点间距
@@ -379,7 +383,7 @@ elif st.session_state.page == "learning_test":
                 ]
             )
             user_ans = q
-            correct_ans = ["从当前节点到终点的预估代价"]
+            correct_ans = "从当前节点到终点的预估代价"
             is_text_input = False
 
     st.divider()
@@ -405,7 +409,7 @@ elif st.session_state.page == "learning_test":
                 is_correct = any(final_user_ans == str(c).lower().replace(" ", "") for c in correct_ans)
             else:
             # 选择题：直接比对
-                is_correct = (user_ans in correct_ans)
+                is_correct = (user_ans == correct_ans)
 
             # 3. 结果反馈
             if is_correct:
