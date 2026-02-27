@@ -63,6 +63,14 @@ def safe_get_value(df, key, default):
     result = df.loc[df["key"] == key, "value"]
     return result.values[0] if not result.empty else default
 
+# 随堂测试写入成绩
+def submit_score(student_name, score, session_id):
+    supabase.table("quiz_results").upsert({
+        "session_id": session_id,
+        "student_name": student_name,
+        "score": score
+    }).execute()
+
 # 初始化全局状态
 def init_state():
     if 'page' not in st.session_state:
@@ -75,8 +83,6 @@ def init_state():
         st.session_state.learned_modules = set()
     if 'step' not in st.session_state:
         st.session_state.step = 0
-    if 'quiz_finished' not in st.session_state:
-        st.session_state.quiz_finished = False
 
 # 迪杰斯特拉算法教学内容设计
 def generate_dijkstra_steps():
@@ -386,6 +392,18 @@ with st.sidebar:
             
         with col_admin2:
             if st.button("开始答题"):
+                # 创建新session
+                new_session = supabase.table("quiz_sessions").insert({
+                    "started_at": time.strftime("%Y-%m-%d %H:%M:%S")
+                }).execute()
+
+                session_id = new_session.data[0]["id"]
+                # 写入classroom_state当前session
+                supabase.table("classroom_state").upsert({
+                    "key": "current_session_id",
+                    "value": session_id
+                }).execute()
+
                 state_df.loc[state_df['key'] == 'quiz_status', 'value'] = 'started'
                 state_df.loc[state_df['key'] == 'start_time', 'value'] = str(time.time())
                 update_system_state(state_df)
@@ -393,6 +411,13 @@ with st.sidebar:
 
         with col_admin3:
             if st.button("结束答题", use_container_width=True):
+                sys_state = get_system_state()
+                session_id = safe_get_value(sys_state, "current_session_id", None)
+
+                if session_id:
+                    supabase.table("quiz_sessions").update({
+                        "ended_at": time.strftime("%Y-%m-%d %H:%M:%S")
+                    }).eq("id", session_id).execute()
                 # 将状态设为 idle (闲置)
                 state_df.loc[state_df['key'] == 'quiz_status', 'value'] = 'idle'
                 # 清空当前主题
@@ -468,9 +493,6 @@ elif st.session_state.page == "dashboard":
         # 只有在老师发布了题目（ready）或者正在答题（started）时才显示按钮
         st.warning("限时随堂测试已发布")
         if st.button("开始进入答题模式", use_container_width=True):
-            if st.session_state.quiz_finished:
-                st.session_state.page = "result"
-                st.rerun()
             # 初始化答题状态
             st.session_state.quiz_settled = False
             st.session_state.finish_time = 0
@@ -658,9 +680,8 @@ elif st.session_state.page == "learning_test":
 
 # 随堂测试
 elif st.session_state.page == "quiz":
-    if "last_refresh" not in st.session_state:
+    if "last_refresh" not in st.session_state: 
         st.session_state.last_refresh = time.time()
-
     if time.time() - st.session_state.last_refresh > 2:
         st.session_state.last_refresh = time.time()
         st.rerun()
@@ -683,14 +704,11 @@ elif st.session_state.page == "quiz":
 
     st.title(f"课堂测试：{topic}")
 
-    if status == "idle" and st.session_state.page != "quiz":
-        st.session_state.quiz_finished = False
-
     if status == "ready":
         st.info("答题主题已就绪，请等待老师点击『开始答题』...")
         if st.button("刷新状态"): st.rerun()
 
-    if status == "started":
+    elif status == "started":
         # 计算统一时间
         global_start = float(safe_get_value(sys_state, "start_time", "0"))
         elapsed = time.time() - global_start
@@ -698,7 +716,6 @@ elif st.session_state.page == "quiz":
         
         if remaining <= 0:
             st.warning("时间到！正在自动结算...")
-            st.session_state.quiz_finished = True
             st.session_state.page = "result"; st.rerun()
 
         st.error(f"全班统一倒计时：{remaining} 秒")
@@ -723,7 +740,6 @@ elif st.session_state.page == "quiz":
                     st.session_state.quiz_step = current_q_idx + 1
                 else:
                     st.session_state.finish_time = elapsed
-                    st.session_state.quiz_finished = True
                     st.session_state.page = "result"
                 st.rerun()
         else:
@@ -741,6 +757,17 @@ elif st.session_state.page == "result":
         df = get_student_data()
         df.loc[df["name"] == st.session_state.user, "total_score"] = st.session_state.score
         save_student_data(df)
+
+        sys_state = get_system_state()
+        session_id = safe_get_value(sys_state, "current_session_id", None)
+
+        if session_id:
+            submit_score(
+                st.session_state.user,
+                st.session_state.quiz_score,
+                session_id
+            )
+
         st.session_state.quiz_settled = True
 
     if st.button("返回主页"):
@@ -748,7 +775,6 @@ elif st.session_state.page == "result":
         st.session_state.quiz_score = 0
         st.session_state.quiz_step = 0
         st.session_state.page = "dashboard"
-        st.session_state.quiz_finished = True
         st.rerun()
 
 # 积分排行榜
