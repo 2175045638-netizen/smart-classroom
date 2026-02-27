@@ -332,8 +332,7 @@ elif st.session_state.page == "learning":
                 st.session_state.page = "learning_test"
                 st.rerun()
         # ... 这里的知识检验/返回首页逻辑保持不变 ...
-                
-# --- 4. 知识检验 ---
+
 # --- 4. 知识检验 ---
 elif st.session_state.page == "learning_test":
     algo = st.session_state.current_algo
@@ -387,7 +386,7 @@ elif st.session_state.page == "learning_test":
         if is_text_input:
             # 问答题：去空格、转小写进行模糊匹配
             final_user_ans = user_ans.strip().lower().replace(" ", "")
-            is_correct = any(final_user_ans == str(c).lower().replace(" ", "") for c in correct_ans_list)
+            is_correct = any(final_user_ans == str(c).lower().replace(" ", "") for c in correct_ans)
         else:
             # 选择题：直接比对
             is_correct = (user_ans in correct_ans)
