@@ -8,15 +8,27 @@ import numpy as np
 
 # --- 0. 数据库连接与初始化 ---
 # 在 Streamlit Cloud 的 Secrets 中配置表格链接
-conn = st.connection("gsheets", type=GSheetsConnection)
+conn_data = st.connection("gsheets_data", type=GSheetsConnection)
 
-def get_data():
-    # ttl=0 确保每次读取都是最新的云端数据
-    return conn.read(ttl=0)
+# 连接2：答题状态控制表
+conn_control = st.connection("gsheets_control", type=GSheetsConnection)
 
-def save_data(df):
-    conn.update(data=df)
+def get_student_data():
+    # 默认读取该文件的第一个工作表
+    return conn_data.read(ttl=0)
+
+def save_student_data(df):
+    conn_data.update(data=df)
     st.cache_data.clear()
+
+# 操作【答题状态控制】表的函数
+def get_system_state():
+    # 假设你的状态数据在名为 "Sheet1" 的工作表里
+    return conn_control.read(ttl=0)
+
+def update_system_state(df):
+    conn_control.update(data=df)
+    # 无需清除整个 cache，因为这个表变动频繁
 
 # --- 初始化全局状态 ---
 def init_state():
@@ -333,11 +345,38 @@ with st.sidebar:
     admin_pwd = st.text_input("管理员密码", type="password")
     if admin_pwd == "666888": # 你可以修改自己的密码
         st.subheader("👨‍🏫 教师后台数据管理")
-        all_data = get_data()
+        all_data = get_student_data()
         edited_df = st.data_editor(all_data, num_rows="dynamic")
         if st.button("💾 保存修改到云端"):
-            save_data(edited_df)
+            save_student_data(edited_df)
             st.success("云端数据同步成功！")
+
+        st.subheader("📢 课堂答题同步控制")
+    
+        # 读取当前的全局状态表
+        # 注意：这里需要指定对应的 worksheet 名称
+        state_df = get_system_state()
+
+        c1, c2, c3 = st.columns(3)
+    
+        with c1:
+            if st.button("🚩 发布主题"):
+                state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'ready'
+                update_system_state(state_df)
+                st.toast("已切换至等待模式")
+        with c2:
+            if st.button("🚀 开始计时"):
+                state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'started'
+                # 记录全员统一的开始时间
+                state_df.loc[state_df['Key'] == 'start_time', 'Value'] = str(time.time())
+                update_system_state(state_df)
+                st.toast("全员开始答题！")
+
+        with c3:
+            if st.button("🛑 结束答题"):
+                state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'ended'
+                update_system_state(state_df)
+                st.toast("答题已关闭")
 
 # --- 1. 登录页面 ---
 if st.session_state.page == "login":
@@ -347,7 +386,7 @@ if st.session_state.page == "login":
         if name:
             st.session_state.user = name
             # 登录时从云端同步该学生的旧积分
-            df = get_data()
+            df = get_student_data()
             if name in df["学生"].values:
                 user_row = df[df["学生"] == name].iloc[0]
                 st.session_state.score = int(user_row["总积分"])
@@ -361,7 +400,7 @@ if st.session_state.page == "login":
                     "总积分": 0, 
                     "Dijkstra_已完成": False, 
                     "AStar_已完成": False}])
-                save_data(pd.concat([df, new_user], ignore_index=True))
+                save_student_data(pd.concat([df, new_user], ignore_index=True))
             st.session_state.page = "dashboard"
             st.rerun()
 
@@ -487,7 +526,6 @@ elif st.session_state.page == "learning":
                 st.rerun()
 
 # --- 4. 知识检验 ---
-# --- 4. 知识检验 ---
 elif st.session_state.page == "learning_test":
     algo = st.session_state.current_algo
     is_completed = algo in st.session_state.learned_modules
@@ -564,7 +602,7 @@ elif st.session_state.page == "learning_test":
                 st.session_state.learned_modules.add(algo)
                 st.session_state.score += 50  # 假设给 50 分
                 # 同步到云端
-                df = get_data()
+                df = get_student_data()
                 idx = df[df["学生"] == st.session_state.user].index
                 if not idx.empty:
                     df.loc[idx, "总积分"] = st.session_state.score
@@ -572,7 +610,7 @@ elif st.session_state.page == "learning_test":
                     column_name = f"{algo}_已完成"
                     if column_name in df.columns:
                         df.loc[idx, column_name] = True
-                    save_data(df)
+                    save_student_data(df)
                 st.balloons()
                 time.sleep(1)
                 st.rerun()
@@ -604,14 +642,14 @@ elif st.session_state.page == "result":
     st.metric("本次得分", st.session_state.quiz_score)
     st.session_state.score += st.session_state.quiz_score
     # 答题结束同步总分到云端
-    df = get_data()
+    df = get_student_data()
     df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
-    save_data(df)
+    save_student_data(df)
     if st.button("返回大厅"): st.session_state.page = "dashboard"; st.rerun()
 
 elif st.session_state.page == "leaderboard":
     st.title("🏆 班级荣誉榜")
-    df = get_data().sort_values(by="总积分", ascending=False).reset_index(drop=True)
+    df = get_student_data().sort_values(by="总积分", ascending=False).reset_index(drop=True)
     for i, row in df.iterrows():
         style = f"rank-{i+1}" if i < 3 else ""
         st.markdown(f'<div style="display:flex; justify-content:space-between; padding:10px;">'
