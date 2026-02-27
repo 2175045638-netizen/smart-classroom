@@ -423,7 +423,7 @@ with st.sidebar:
                     }).eq("key", "current_session_id").execute()
                 state_df.loc[state_df['key'] == 'quiz_status', 'value'] = 'idle'
                 state_df.loc[state_df['key'] == 'current_topic', 'value'] = 'None'
-                state_df.loc[state_df['key'] == 'current_session_id', 'value'] = "closed" 
+                state_df.loc[state_df['key'] == 'current_session_id', 'value'] = None 
                 update_system_state(state_df)
                 st.toast("答题通道已关闭")
                 st.rerun()
