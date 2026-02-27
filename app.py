@@ -92,30 +92,59 @@ def generate_dijkstra_steps():
     return all_steps
 
 def render_dijkstra_snapshot(snapshot):
-    import networkx as nx
-    import matplotlib.pyplot as plt
-    import pandas as pd
+    # --- 1. 定义图结构与坐标 (确保与你图片中的位置一致) ---
+    edges = [
+        (0, 1, 4), (0, 7, 8), (1, 7, 11), (1, 2, 8), (7, 8, 7), (7, 6, 1),
+        (2, 8, 2), (8, 6, 6), (2, 3, 7), (2, 5, 4), (6, 5, 2), (3, 5, 14),
+        (3, 4, 9), (5, 4, 10)
+    ]
+    G = nx.Graph()
+    G.add_weighted_edges_from(edges)
+    
+    # 手动固定节点坐标，还原图片布局
+    pos = {
+        0: (0, 1), 1: (1, 2), 7: (1, 0), 2: (2, 2), 8: (2, 1), 
+        6: (2, 0), 3: (3, 2), 5: (3, 0), 4: (4, 1)
+    }
 
-    # 1. 设置布局
-    c1, c2 = st.columns([1.2, 1])
+    # --- 2. 创建 Streamlit 分栏 ---
+    col1, col2 = st.columns([1.2, 1])
 
-    # 2. 左侧：图表可视化 (利用 Matplotlib)
-    with c1:
-        # 这里复用之前的绘图代码...
-        # 红色表示当前正在处理的节点，绿色表示已确定的最短路径点
-        pass 
+    # --- 3. 左侧：绘制 NetworkX 图 ---
+    with col1:
+        fig, ax = plt.subplots(figsize=(6, 5))
+        
+        # 节点颜色逻辑：当前考察点红色，已确定点绿色，其余灰色
+        node_colors = []
+        for n in G.nodes():
+            if n == snapshot["curr"]:
+                node_colors.append('#FF4B4B') # 红色
+            elif snapshot["visited"][n]:
+                node_colors.append('#2E7D32') # 绿色
+            else:
+                node_colors.append('#BDBDBD') # 灰色
 
-    # 3. 右侧：详细步骤表 (对应你要求的 4+8=12 样式)
-    with c2:
+        # 绘图
+        nx.draw(G, pos, with_labels=True, node_color=node_colors, 
+                node_size=1000, font_color='white', font_weight='bold', ax=ax)
+        
+        # 绘制边权重
+        edge_labels = nx.get_edge_attributes(G, 'weight')
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=10, ax=ax)
+        
+        plt.axis('off') # 隐藏坐标轴
+        st.pyplot(fig)
+        plt.close()
+
+    # --- 4. 右侧：绘制实时状态表 (包含详细计算过程) ---
+    with col2:
         st.write("**实时路径状态表**")
         df = pd.DataFrame({
             "节点": [f"点 {i}" for i in range(9)],
-            "确定 (√)": ["✅" if snapshot["visited"][i] else "" for i in range(9)],
+            "确定 (√)": ["√" if snapshot["visited"][i] else "" for i in range(9)],
             "计算过程 / 距离": [snapshot["dist_form"][i] for i in range(9)],
             "前驱点": [snapshot["prev"][i] for i in range(9)]
         })
-        
-        # 使用 st.table 展示，因为它更像静态表格，不会有滚动条干扰
         st.table(df)
 
 init_state()
