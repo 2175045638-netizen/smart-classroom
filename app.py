@@ -374,7 +374,7 @@ with st.sidebar:
         # 选择主题
         selected_topic = st.selectbox("选择本次答题主题", list(QUIZ_BANK.keys()))
     
-        col_admin1, col_admin2 = st.columns(2)
+        col_admin1, col_admin2, col_admin3 = st.columns(3)
         with col_admin1:
             if st.button("🚩 发布主题"):
                 state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'ready'
@@ -388,6 +388,16 @@ with st.sidebar:
                 state_df.loc[state_df['Key'] == 'start_time', 'Value'] = str(time.time())
                 update_system_state(state_df)
                 st.toast("全员计时开始！")
+
+        with col_admin3:
+            if st.button("🛑 结束答题", use_container_width=True):
+                # 将状态设为 idle (闲置)
+                state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'idle'
+                # 清空当前主题
+                state_df.loc[state_df['Key'] == 'current_topic', 'Value'] = 'None'
+                update_system_state(state_df)
+                st.toast("答题通道已关闭")
+                st.rerun()
 
 # --- 1. 登录页面 ---
 if st.session_state.page == "login":
@@ -417,6 +427,12 @@ if st.session_state.page == "login":
 
 # --- 2. 仪表盘 ---
 elif st.session_state.page == "dashboard":
+    sys_state = get_system_state()
+    # 容错处理：确保能读取到状态
+    try:
+        current_status = sys_state.loc[sys_state['Key'] == 'quiz_status', 'Value'].values[0]
+    except:
+        current_status = 'idle'
     st.title(f"👋 你好, {st.session_state.user}")
     col1, col2 = st.columns(2)
     with col1:
@@ -439,9 +455,19 @@ elif st.session_state.page == "dashboard":
                 st.session_state.current_algo = "AStar"; st.session_state.page = "learning"; st.session_state.step = 0; st.rerun()
 
     st.divider()
-    st.warning("🔔 限时随堂测试已发布")
-    if st.button("🚀 开始进入答题模式"):
-        st.session_state.page = "quiz"; st.session_state.quiz_step = 1; st.session_state.quiz_score = 0; st.session_state.start_time = time.time(); st.rerun()
+    if current_status in ["ready", "started"]:
+        # 只有在老师发布了题目（ready）或者正在答题（started）时才显示按钮
+        st.warning("🔔 限时随堂测试已发布")
+        if st.button("🚀 开始进入答题模式", use_container_width=True):
+            # 初始化答题状态
+            st.session_state.page = "quiz"
+            st.session_state.quiz_step = 0
+            st.session_state.quiz_score = 0
+            st.rerun()
+    else:
+        # 当状态为 idle 或 ended 时
+        st.info("💡 限时随堂测试暂未发布")
+        # 这里不放置 st.button，按钮就会自然消失
 
 # --- 3. 教学模式 ---
 elif st.session_state.page == "learning":
