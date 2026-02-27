@@ -516,6 +516,7 @@ elif st.session_state.page == "dashboard":
                 st.session_state.page = "quiz"
                 st.session_state.quiz_step = 0
                 st.session_state.quiz_score = 0
+                st.session_state.current_session_id = session_id
                 st.rerun()
     else:
         # 当状态为 idle 或 ended 时
@@ -772,7 +773,7 @@ elif st.session_state.page == "result":
     if not st.session_state.get("quiz_settled", False):
 
         sys_state = get_system_state()
-        session_id = safe_get_value(sys_state, "current_session_id", None)
+        session_id = st.session_state.get("current_session_id")
 
         if session_id:
             existing = supabase.table("quiz_results")\
