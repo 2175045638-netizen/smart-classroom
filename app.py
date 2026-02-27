@@ -44,6 +44,14 @@ def update_system_state(df):
     conn_control.update(data=df)
     # 无需清除整个 cache，因为这个表变动频繁
 
+def update_system_state(df):
+    try:
+        conn_control.update(data=df)
+    except Exception as e:
+        if "429" in str(e):
+            st.error("操作太快啦！Google 正在排队，请 5 秒后重试。")
+            time.sleep(5)
+
 # --- 初始化全局状态 ---
 def init_state():
     if 'page' not in st.session_state:
