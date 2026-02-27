@@ -47,8 +47,8 @@ def generate_dijkstra_steps():
     all_steps.append({
         "t": "算法简介", 
         "c": ("迪杰斯特拉算法（Dijkstra's Algorithm）是由荷兰计算机科学家艾兹赫尔·戴克斯特拉在 1956 年提出的一种单源最短路径算法。\n\n"
-              "该算法的核心思想是贪心策略，即每次都选择当前已知距离源点最近的一个节点，并以此为基准更新其邻居的距离。\n\n"
-              "接下来，我们将以下图为例，通过分步演示来学习这一算法。"), 
+              "该算法该算法既适用于无向加权图，也适用于有向加权图。它的核心思想是贪心策略，即每次都选择当前已知距离源点最近的一个节点，并以此为基准更新其邻居的距离。\n\n"
+              "接下来，我们将以下面的无向加权图为例，通过分步演示来学习这一算法。"), 
         "img": "assets/dijkstra_demo1.png" # 这里放你原本的简介图片路径
     })
     
@@ -95,6 +95,14 @@ def generate_dijkstra_steps():
             "type": "interactive_demo",
             "snapshot": {"dist_form": dist_formula.copy(), "prev": prev.copy(), "visited": visited.copy(), "curr": curr}
         })
+
+        all_steps.append({
+        "t": "注意事项", 
+        "c": ("Dijkstra算法虽然复杂度非常优秀（单源最短路中基本上最优），但是它不能用来计算带有负权边的图，即必须保证图中所有边的权值为非负数。\n\n"
+              "请大家思考一下为什么。\n\n"
+              "接下来，请完成知识检验考察大家的学习成果吧。"), 
+   
+    })
         
     return all_steps
 
@@ -271,11 +279,11 @@ elif st.session_state.page == "learning":
     head_col1, head_col2 = st.columns([4, 1])
     
     with head_col1:
-        st.subheader(f"📖 正在学习: {algo}")
+        st.subheader(f"正在学习: {algo}")
     
     with head_col2:
         # 添加返回首页按钮
-        if st.button("🏠 返回首页", key="back_to_main"):
+        if st.button("返回首页", key="back_to_main"):
             st.session_state.page = "dashboard"
             st.session_state.step = 0  # 建议返回时重置步数，下次进入从头开始
             st.rerun()
@@ -326,20 +334,71 @@ elif st.session_state.page == "learning":
         # ... 这里的知识检验/返回首页逻辑保持不变 ...
                 
 # --- 4. 知识检验 ---
+# --- 4. 知识检验 ---
 elif st.session_state.page == "learning_test":
-    st.header("🎯 知识检验")
-    q = st.radio("A* 公式中 h 代表什么？", ["起点距离", "预估终点距离"])
-    if st.button("提交答案"):
-        if "预估" in q:
-            st.session_state.score += 50
-            st.session_state.learned_modules.add(st.session_state.current_algo)
-            # 学习完立刻同步积分到云端
-            df = get_data()
-            df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
-            save_data(df)
-            st.success("获得 50 积分！已保存到云端。")
-        time.sleep(1); st.session_state.page = "dashboard"; st.rerun()
+    algo = st.session_state.current_algo
+    st.header(f"知识检验: {algo}")
+    
+    # 使用容器包裹题目，视觉上更整洁
+    with st.container():
+        if algo == "Dijkstra":
+            st.write(" **Dijkstra 算法** 测验：")
+            q_input = st.text_input("如图，这是一个有向加权图，权重代表两点之间的距离。请使用 Dijkstra 算法，计算出从A点到F点的最短路径。（输入示例：D->F->E）")
+            # --- 新增：图片居中显示 ---
+            st.write("") # 增加一点间距
+            # 创建三列，比例为 1:2:1
+            img_col1, img_col2, img_col3 = st.columns([1, 2, 1])
+            with img_col2:
+                # 替换为你想要显示的图片路径或 URL
+                st.image("assets/d_test1.png", 
+                         caption="题目示意图", 
+                         use_container_width=True)
+            
+            correct_ans = "A->B->D->F"
+            
+        elif algo == "AStar":
+            st.write("针对 **A* 算法** 的小测验：")
+            q = st.radio(
+                "A* 算法的代价函数 f(n) = g(n) + h(n) 中，h(n) 代表什么？",
+                [
+                    "请选择一个选项",
+                    "从起点到当前节点的实际代价", 
+                    "从当前节点到终点的预估代价", 
+                    "算法运行的总步数"
+                ]
+            )
+            correct_ans = "从当前节点到终点的预估代价"
 
+    st.divider()
+
+    # 提交逻辑
+    if st.button("提交答案", use_container_width=True):
+        if q == "请选择一个选项":
+            st.warning("请先选择一个答案再提交哦！")
+        elif q == correct_ans:
+            st.balloons()
+            st.success("回答正确！太棒了 🎉")
+            
+            # 只有第一次通过该模块才加分（可选逻辑）
+            if algo not in st.session_state.learned_modules:
+                st.session_state.score += 50
+                st.session_state.learned_modules.add(algo)
+                
+                # 同步到云端
+                df = get_data()
+                df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
+                save_data(df)
+                st.info("积分 +50，已同步到云端！")
+            
+            time.sleep(2)
+            st.session_state.page = "dashboard"
+            st.rerun()
+        else:
+            st.error("答案错误，再温习一下算法过程吧！")
+            if st.button("返回学习"):
+                st.session_state.step = 0
+                st.session_state.page = "learning"
+                st.rerun()
 # --- 5. 课堂答题 (锁定模式) ---
 elif st.session_state.page == "quiz":
     elapsed = time.time() - st.session_state.start_time
