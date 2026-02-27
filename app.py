@@ -25,6 +25,25 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# 创建 Realtime 监听函数
+def subscribe_classroom():
+    channel = supabase.channel(f"classroom_channel_{st.session_state.user}")
+
+    def handle_update(payload):
+        st.session_state["realtime_trigger"] = True
+
+    channel.on(
+        "postgres_changes",
+        {
+            "event": "*",
+            "schema": "public",
+            "table": "classroom_state",
+        },
+        handle_update,
+    ).subscribe()
+
+    return channel
+
 # 学生数据表格
 def get_student_data():
     response = supabase.table("students").select("*").execute()
@@ -339,6 +358,13 @@ def render_astar_snapshot(snapshot):
     plt.close()
 
 init_state()
+if "realtime_subscribed" not in st.session_state:
+    channel = subscribe_classroom()
+    st.session_state.realtime_subscribed = True
+    st.session_state.channel = channel
+if st.session_state.get("realtime_trigger"):
+    st.session_state.realtime_trigger = False
+    st.rerun()
 
 # 样式美化
 st.markdown("""
@@ -465,6 +491,8 @@ elif st.session_state.page == "dashboard":
         st.warning("限时随堂测试已发布")
         if st.button("开始进入答题模式", use_container_width=True):
             # 初始化答题状态
+            st.session_state.quiz_settled = False
+            st.session_state.finish_time = 0
             st.session_state.page = "quiz"
             st.session_state.quiz_step = 0
             st.session_state.quiz_score = 0
@@ -657,11 +685,7 @@ elif st.session_state.page == "quiz":
         st.session_state.quiz_score = 0
     if "finish_time" not in st.session_state:
         st.session_state.finish_time = 0
-    if "last_refresh" not in st.session_state:
-        st.session_state.last_refresh = time.time()
-    if time.time() - st.session_state.last_refresh > 2:
-        st.session_state.last_refresh = time.time()
-        st.rerun()
+    
 
     sys_state = get_system_state()
 
@@ -701,7 +725,7 @@ elif st.session_state.page == "quiz":
             else:
                 ans = st.text_input("填写答案", key=f"q_{current_q_idx}")
 
-            if st.button("确认提交本题"):
+            if st.button("确认提交本题", key=f"submit_{current_q_idx}"):
                 # 判定对错
                 if str(ans).strip().lower() == str(q_data['a']).strip().lower():
                     st.session_state.quiz_score += q_data['pts']
@@ -712,7 +736,9 @@ elif st.session_state.page == "quiz":
                     st.session_state.page = "result"
                 st.rerun()
         else:
-            st.session_state.page = "result"; st.rerun()
+            st.warning("测试已结束")
+            st.session_state.page = "result"
+            st.rerun()
 
 # 答题报告
 elif st.session_state.page == "result":
