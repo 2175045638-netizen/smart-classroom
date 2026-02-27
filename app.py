@@ -97,7 +97,7 @@ def generate_dijkstra_steps():
     })
     
     all_steps.append({
-        "t": "准备阶段",
+        "t": "初始化阶段",
         "c": "算法开始，起点 0 距离设为 0，其余设为无穷大。",
         "type": "interactive_demo",
         "snapshot": {"dist_form": dist_formula.copy(), "prev": prev.copy(), "visited": visited.copy(), "curr": None}
@@ -240,7 +240,7 @@ def generate_Astar_full_steps():
     })
 
     all_steps.append({
-        "t": "A* 算法准备阶段",
+        "t": "A* 算法初始化阶段",
         "c": f"起点设为 {start}，终点为 {goal}。我们将使用曼哈顿距离作为 $h(n)$。",
         "type": "astar_visual",
         "snapshot": {
@@ -282,8 +282,8 @@ def generate_Astar_full_steps():
 
         all_steps.append({
             "t": f"正在探索节点 {curr}",
-            "explanation": f"从 Open List 中选择了 $f(n)$ 最小的节点 {curr}。",
-            "c": "\n".join([f"· {log}" for log in update_logs]) if update_logs else "当前节点邻居已全部探索或不可达。",
+            "explanation": f"选择 $f(n)$ 最小的节点 {curr}。",
+            "c": "\n".join([f"· {log}" for log in update_logs]) if update_logs else "当前节点的邻近节点已全部探索或不可达。",
             "type": "astar_visual",
             "snapshot": {
                 "grid": grid.tolist(),
@@ -521,7 +521,7 @@ elif st.session_state.page == "learning":
         with col_viz:
             render_astar_snapshot(data['snapshot'])
         with col_data:
-            st.markdown("🔍 **节点代价分析**")
+            st.markdown("**节点代价分析**")
             curr_node = data['snapshot']['curr']
             if curr_node:
                 g = data['snapshot']['g_score'].get(curr_node, 0)
@@ -534,7 +534,6 @@ elif st.session_state.page == "learning":
             else:
                 st.write("等待算法开始...")
             st.divider()
-            st.write("**算法日志:**")
             st.write(data['c'])
             
     else:
