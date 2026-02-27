@@ -395,18 +395,6 @@ with st.sidebar:
             
         with col_admin2:
             if st.button("开始答题"):
-                # 创建新session
-                new_session = supabase.table("quiz_sessions").insert({
-                    "started_at": time.strftime("%Y-%m-%d %H:%M:%S")
-                }).execute()
-
-                session_id = new_session.data[0]["id"]
-                # 写入classroom_state当前session
-                supabase.table("classroom_state").upsert({
-                    "key": "current_session_id",
-                    "value": session_id
-                }).execute()
-
                 state_df.loc[state_df['key'] == 'quiz_status', 'value'] = 'started'
                 state_df.loc[state_df['key'] == 'start_time', 'value'] = str(time.time())
                 update_system_state(state_df)
@@ -414,16 +402,8 @@ with st.sidebar:
 
         with col_admin3:
             if st.button("结束答题", use_container_width=True):
-                sys_state = get_system_state()
-                session_id = safe_get_value(sys_state, "current_session_id", None)
-
-                if session_id:
-                    supabase.table("classroom_state").update({
-                        "value": None
-                    }).eq("key", "current_session_id").execute()
                 state_df.loc[state_df['key'] == 'quiz_status', 'value'] = 'idle'
                 state_df.loc[state_df['key'] == 'current_topic', 'value'] = 'None'
-                state_df.loc[state_df['key'] == 'current_session_id', 'value'] = None 
                 update_system_state(state_df)
                 st.toast("答题通道已关闭")
                 st.rerun()
@@ -494,31 +474,14 @@ elif st.session_state.page == "dashboard":
     if current_status in ["ready", "started"]:
         # 只有在老师发布了题目（ready）或者正在答题（started）时才显示按钮
         st.warning("限时随堂测试已发布")
-        sys_state = get_system_state()
-        session_id = safe_get_value(sys_state, "current_session_id", None)
-
-        # 查询是否已经答过
-        already_done = False
-        if session_id:
-            result = supabase.table("quiz_results")\
-                .select("id")\
-                .eq("session_id", session_id)\
-                .eq("student_name", st.session_state.user)\
-                .execute()
-            if result.data:
-                already_done = True
-
-        if already_done:
-            st.warning("你已完成本场测试，无法重复作答。")
-        else:
-            if st.button("开始进入答题模式", use_container_width=True):
-                st.session_state.quiz_step = 0
-                st.session_state.quiz_score = 0
-                st.session_state.quiz_settled = False
-                st.session_state.current_session_id = session_id
-                
-                st.session_state.page = "quiz"
-                st.rerun()
+        if st.button("开始进入答题模式", use_container_width=True):
+            # 初始化答题状态 
+            st.session_state.quiz_settled = False 
+            st.session_state.finish_time = 0 
+            st.session_state.page = "quiz" 
+            st.session_state.quiz_step = 0 
+            st.session_state.quiz_score = 0 
+            st.rerun()
     else:
         # 当状态为 idle 或 ended 时
         st.info("限时随堂测试暂未发布")
@@ -699,22 +662,6 @@ elif st.session_state.page == "learning_test":
 
 # 随堂测试
 elif st.session_state.page == "quiz":
-    sys_state = get_system_state()
-    current_session_id = safe_get_value(sys_state, "current_session_id", None)
-    
-    # 检查数据库：该学生是否已经在当前这一轮提交过成绩
-    check_done = supabase.table("quiz_results")\
-        .select("id")\
-        .eq("session_id", current_session_id)\
-        .eq("student_name", st.session_state.user)\
-        .execute()
-
-    if check_done.data:
-        st.warning("本轮测试你已提交")
-        if st.button("返回主页"):
-            st.session_state.page = "dashboard"
-            st.rerun()
-        st.stop() # 停止渲染后续题目
     if "last_refresh" not in st.session_state: 
         st.session_state.last_refresh = time.time()
     if time.time() - st.session_state.last_refresh > 2:
@@ -740,7 +687,7 @@ elif st.session_state.page == "quiz":
     st.title(f"课堂测试：{topic}")
 
     if status == "ready":
-        st.info("答题主题已就绪，请等待老师点击『开始答题』...")
+        st.info("题目已就绪，请等待老师点击“开始答题”...")
         if st.button("刷新状态"): st.rerun()
 
     elif status == "started":
@@ -788,31 +735,10 @@ elif st.session_state.page == "result":
     st.metric("本次得分", st.session_state.quiz_score)
 
     if not st.session_state.get("quiz_settled", False):
-
-        sys_state = get_system_state()
-        session_id = st.session_state.get("current_session_id")
-
-        if session_id:
-            existing = supabase.table("quiz_results")\
-                .select("id")\
-                .eq("session_id", session_id)\
-                .eq("student_name", st.session_state.user)\
-                .execute()
-
-            if not existing.data:
-                # 只在第一次提交时加分
-                st.session_state.score += st.session_state.quiz_score
-
-                df = get_student_data()
-                df.loc[df["name"] == st.session_state.user, "total_score"] = st.session_state.score
-                save_student_data(df)
-
-            submit_score(
-                st.session_state.user,
-                st.session_state.quiz_score,
-                session_id
-            )
-
+        st.session_state.score += st.session_state.quiz_score 
+        df = get_student_data() 
+        df.loc[df["name"] == st.session_state.user, "total_score"] = st.session_state.score 
+        save_student_data(df) 
         st.session_state.quiz_settled = True
 
     if st.button("返回主页"):
