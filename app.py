@@ -385,47 +385,54 @@ elif st.session_state.page == "learning_test":
     st.divider()
 
     # 提交逻辑
-    if st.button("确认提交", use_container_width=True):
-        # 1. 空值检查
-        if user_ans == "" or user_ans == "请选择":
-            st.warning("⚠️ 请先完成题目再提交！")
-            st.stop()
-
-        # 2. 格式化处理
-        if is_text_input:
-            # 问答题：去空格、转小写进行模糊匹配
-            final_user_ans = user_ans.strip().lower().replace(" ", "")
-            is_correct = any(final_user_ans == str(c).lower().replace(" ", "") for c in correct_ans)
-        else:
-            # 选择题：直接比对
-            is_correct = (user_ans in correct_ans)
-
-        # 3. 结果反馈
-        if is_correct:
-            st.balloons()
-            st.success("🎉 回答正确！积分 +50")
-            
-            # 积分同步逻辑
-            if algo not in st.session_state.learned_modules:
-                st.session_state.score += 50
-                st.session_state.learned_modules.add(algo)
-                # 更新云端数据
-                try:
-                    df = get_data()
-                    df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
-                    save_data(df)
-                except:
-                    st.error("云端同步失败，请检查网络")
-            
-            time.sleep(2)
+    if is_completed:
+        # 已完成模式：只显示返回按钮
+        if st.button("返回主页", use_container_width=True):
             st.session_state.page = "dashboard"
             st.rerun()
-        else:
-            st.error("答案有误，请再思考一下，或者返回重新学习。")
-            if st.button("重新看一遍教程"):
-                st.session_state.step = 0
-                st.session_state.page = "learning"
+    else:
+        # 未完成模式：显示提交逻辑
+        if st.button("确认提交", use_container_width=True):
+            # 1. 空值检查
+            if user_ans == "" or user_ans == "请选择":
+                st.warning("⚠️ 请先完成题目再提交！")
+                st.stop()
+
+            # 2. 格式化处理
+            if is_text_input:
+            # 问答题：去空格、转小写进行模糊匹配
+                final_user_ans = user_ans.strip().lower().replace(" ", "")
+                is_correct = any(final_user_ans == str(c).lower().replace(" ", "") for c in correct_ans)
+            else:
+            # 选择题：直接比对
+                is_correct = (user_ans in correct_ans)
+
+            # 3. 结果反馈
+            if is_correct:
+                st.balloons()
+                st.success("🎉 回答正确！积分 +50")
+            
+                # 积分同步逻辑
+                if algo not in st.session_state.learned_modules:
+                    st.session_state.score += 50
+                    st.session_state.learned_modules.add(algo)
+                    # 更新云端数据
+                    try:
+                        df = get_data()
+                        df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
+                        save_data(df)
+                    except:
+                        st.error("云端同步失败，请检查网络")
+            
+                time.sleep(2)
+                st.session_state.page = "dashboard"
                 st.rerun()
+            else:
+                st.error("答案有误，请再思考一下，或者返回重新学习。")
+                if st.button("重新看一遍教程"):
+                    st.session_state.step = 0
+                    st.session_state.page = "learning"
+                    st.rerun()
 # --- 5. 课堂答题 (锁定模式) ---
 elif st.session_state.page == "quiz":
     elapsed = time.time() - st.session_state.start_time
