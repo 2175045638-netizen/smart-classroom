@@ -4,6 +4,7 @@ import time
 from streamlit_gsheets import GSheetsConnection
 import networkx as nx
 import matplotlib.pyplot as plt
+import numpy as np
 
 # --- 0. 数据库连接与初始化 ---
 # 在 Streamlit Cloud 的 Secrets 中配置表格链接
@@ -89,7 +90,7 @@ def generate_dijkstra_steps():
         unvisited.remove(curr)
 
         all_steps.append({
-            "t": f"分布学习--处理节点 {curr}",
+            "t": f"分步学习--处理节点 {curr}",
             "explanation": f"正在从节点 {curr} 向外探索邻居。",
             "c": step_explanation + "\n\n" + ("\n".join([f"- {log}" for log in update_logs])),
             "type": "interactive_demo",
@@ -160,6 +161,155 @@ def render_dijkstra_snapshot(snapshot):
             "前驱点": [snapshot["prev"][i] for i in range(9)]
         })
         st.table(df)
+
+def generate_grid_map():
+    """生成一个10x10的网格地图，0为平地，1为障碍"""
+    grid = np.zeros((10, 10))
+    # 设置障碍物 (模仿 U 型障碍)
+    grid[3:7, 3] = 1
+    grid[3, 3:7] = 1
+    grid[7, 3:7] = 1
+    return grid
+
+# --- 新增：A* 分步逻辑生成 ---
+def generate_Astar_full_steps():
+    grid = generate_grid_map()
+    start = (2, 2)
+    goal = (8, 8)
+    
+    def heuristic(a, b):
+        # 使用曼哈顿距离
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+    open_list = {start: 0 + heuristic(start, goal)}
+    g_score = {start: 0}
+    parent = {}
+    closed_list = set()
+
+    all_steps = []
+
+    all_steps.append({
+        "t": "算法简介", 
+        "c": ("A-star（A*）算法是一种经典的启发式搜索算法，用来在图或状态空间中找到从起点到终点的代价最小路径。它结合了Dijkstra算法和贪心算法的优点，通过启发式函数在保证最优解的同时提高搜索效率。\n\n"
+              "A*算法的目标是找到从起点到终点的最短路径。其通过维护一个优先队列（最小堆），根据##估价函数##$f(n)$来选择下一步要探索的节点，其中估价函数由两部分组成：\n\n"
+              "实际代价$g(n)$：从起点到当前节点$n$的已知路径代价（已经走了多少步）。\n\n"
+              "启发式代价$h(n)$：从当前节点$n$到终点的估计代价（预测还要多少步到达终点）。\n\n"
+              "因此，总估价函数表达为： $f(n) = g(n) + h(n)$\n\n"
+              "A*算法每次选择$f(n)$最小的节点进行扩展，直到找到终点。\n\n"), 
+    })
+    all_steps.append({
+        "t":"启发式代价$h(n)$",
+        "c":("启发式函数的选择决定了 A* 算法的效率，但它必须满足**可接受性（Admissibility）**：\n"
+        "即对于图中任何节点 n，其预估代价 $h(n)$ 必须不大于实际最短路径代价 $h^*(n)$，即：$h(n) \le h^*(n)$。\n\n"
+        "如果 $h(n)$ 是可接受的，A* 算法保证能找到最优解。如果 $h(n)$ 大于实际代价，算法可能运行更快，但无法保证最短路径。\n\n"
+        "常见的启发函数选择：\n\n"
+        "1. **曼哈顿距离 (Manhattan Distance)**：适用于只能在网格中水平或垂直移动的场景。\n"
+        "公式：$h(n) = |x_n - x_{goal}| + |y_n - y_{goal}|$\n\n"
+        "2. **欧几里得距离 (Euclidean Distance)**：适用于可以沿任意角度直线移动的场景。\n"
+        "公式：$h(n) = \sqrt{(x_n - x_{goal})^2 + (y_n - y_{goal})^2}$\n\n"
+        "3. **切比雪夫距离 (Chebyshev Distance)**：适用于允许对角线移动且代价与水平垂直移动相同的场景（如国际象棋的王）。\n"
+        "公式：$h(n) = \max(|x_n - x_{goal}|, |y_n - y_{goal}|)$"),
+    })
+
+    all_steps.append({
+        "t": "A* 算法准备阶段",
+        "c": f"起点设为 {start}，终点为 {goal}。我们将使用曼哈顿距离作为 $h(n)$。",
+        "type": "astar_visual",
+        "snapshot": {
+            "grid": grid.tolist(),
+            "curr": None,
+            "open": list(open_list.keys()),
+            "closed": list(closed_list),
+            "g_score": g_score.copy(),
+            "goal": goal
+        }
+    })
+
+    while open_list:
+        # 获取 f 值最小的节点
+        curr = min(open_list, key=open_list.get)
+        
+        if curr == goal:
+            break
+            
+        del open_list[curr]
+        closed_list.add(curr)
+        
+        update_logs = []
+        # 探索 4 个方向
+        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            neighbor = (curr[0] + dx, curr[1] + dy)
+            
+            if 0 <= neighbor[0] < 10 and 0 <= neighbor[1] < 10:
+                if grid[neighbor[0], neighbor[1]] == 1 or neighbor in closed_list:
+                    continue
+                
+                tentative_g = g_score[curr] + 1
+                if neighbor not in g_score or tentative_g < g_score[neighbor]:
+                    g_score[neighbor] = tentative_g
+                    f_val = tentative_g + heuristic(neighbor, goal)
+                    open_list[neighbor] = f_val
+                    parent[neighbor] = curr
+                    update_logs.append(f"发现节点 {neighbor}: $g={tentative_g}, h={heuristic(neighbor, goal)}, f={f_val}$")
+
+        # 记录当前步骤快照
+        all_steps.append({
+            "t": f"正在探索节点 {curr}",
+            "explanation": f"从 Open List 中选择了 $f(n)$ 最小的节点 {curr}。",
+            "c": "\n".join([f"· {log}" for log in update_logs]) if update_logs else "当前节点邻居已全部探索或不可达。",
+            "type": "astar_visual",
+            "snapshot": {
+                "grid": grid.tolist(),
+                "curr": curr,
+                "open": list(open_list.keys()),
+                "closed": list(closed_list),
+                "g_score": g_score.copy(),
+                "goal": goal
+            }
+        })
+
+    all_steps.append({
+        "t": "与迪杰斯特拉算法对比", 
+        "c": ("相比于 Dijkstra 算法，A* 算法由于其启发式搜索，通常能更快地找到路径，尤其是在大型图中。\n\n"
+              "但是，它要存储开放列表和关闭列表中的所有节点，当图非常大时，可能会占用大量内存。此外，它的性能高度依赖于启发式函数的质量。一个糟糕的启发式函数可能导致算法性能下降，甚至退化为 Dijkstra 算法。\n\n"
+              ), 
+    })
+
+    return all_steps
+
+def render_astar_snapshot(snapshot):
+    grid = np.array(snapshot["grid"])
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.imshow(grid, cmap='Greys', origin='upper')
+    
+    goal = snapshot["goal"]
+    curr_g = snapshot["g_score"]
+
+    for r in range(10):
+        for c in range(10):
+            pos = (r, c)
+            # 只有在 Open 或 Closed 列表中的点才显示数值，避免画面太乱
+            if pos in snapshot["open"] or pos in snapshot["closed"]:
+                g = curr_g.get(pos, 0)
+                h = abs(r - goal[0]) + abs(c - goal[1]) # 曼哈顿距离
+                f = g + h
+                # 在方块中心标注 f 值
+                ax.text(c, r, f'f:{f}', ha='center', va='center', 
+                        color='blue', fontsize=8, fontweight='bold')
+            
+            # 绘制节点颜色
+            if pos in snapshot["closed"]:
+                ax.add_patch(plt.Rectangle((c-0.5, r-0.5), 1, 1, color='#2E7D32', alpha=0.3))
+            elif pos in snapshot["open"]:
+                ax.add_patch(plt.Rectangle((c-0.5, r-0.5), 1, 1, color='#FFD600', alpha=0.4))
+
+    # 绘制当前考察点
+    if snapshot["curr"]:
+        ax.plot(snapshot["curr"][1], snapshot["curr"][0], 'X', color='#FF4B4B', markersize=12)
+
+    ax.set_title("A* Grid Search (Yellow: Open, Green: Visited)", fontsize=10)
+    st.pyplot(fig)
+    plt.close()
 
 init_state()
 
@@ -241,99 +391,100 @@ elif st.session_state.page == "dashboard":
 elif st.session_state.page == "learning":
     algo = st.session_state.current_algo
     
-    # 1. 预定义 AStar 步骤（完全保留你原来的内容）
-    # ---------------------------------------------------------
-    astar_steps = [
-        {"t": "核心概念：贪心算法", "c": "贪心算法选择当前最优路径...", "img": "💡"},
-        {"t": "启发式搜索", "c": "A* 引入了 h(n) 预估代价。", "img": "🔍"}
-    ]
-
-    # 2. 动态生成 Dijkstra 步骤（将其展开为多步演示）
-    # ---------------------------------------------------------
-    # 只有当 algo 是 Dijkstra 时，才生成这组长列表
-    if algo == "Dijkstra":
-        if "dijkstra_full_steps" not in st.session_state:
-            # 这里调用我们之前讨论的 generate_dijkstra_steps() 函数
-            # 它会返回一个包含 10 步左右的列表，每一步都有 snapshot
-            st.session_state.dijkstra_full_steps = generate_dijkstra_steps() 
-        dijkstra_steps = st.session_state.dijkstra_full_steps
+    # 1. 确保数据源已初始化
+    if algo == "AStar":
+        if "astar_full_steps" not in st.session_state:
+            st.session_state.astar_full_steps = generate_Astar_full_steps()
+        current_steps_source = st.session_state.astar_full_steps
     else:
-        dijkstra_steps = []
+        if "dijkstra_full_steps" not in st.session_state:
+            st.session_state.dijkstra_full_steps = generate_dijkstra_steps()
+        current_steps_source = st.session_state.dijkstra_full_steps
 
-    # 3. 汇总所有算法的 steps 字典
-    # ---------------------------------------------------------
-    steps = {
-        "AStar": astar_steps,
-        "Dijkstra": dijkstra_steps
-    }
-
-    # 4. 初始化 step
-    if "step" not in st.session_state:
+    # 2. 越界保护：确保 step 不超过数据长度
+    if st.session_state.step >= len(current_steps_source):
         st.session_state.step = 0
-        
-    # 获取当前步的数据
-    data = steps[algo][st.session_state.step]
+    
+    data = current_steps_source[st.session_state.step]
 
-    # --- 渲染逻辑 (保持你原来的代码不变) ---
+    # --- 标题栏 ---
     head_col1, head_col2 = st.columns([4, 1])
-    
     with head_col1:
-        st.subheader(f"正在学习: {algo}")
-    
+        st.subheader(f"📖 正在学习: {algo} 算法")
     with head_col2:
-        # 添加返回首页按钮
-        if st.button("返回首页", key="back_to_main"):
+        if st.button("🏠 返回首页", key="back_home_btn"):
             st.session_state.page = "dashboard"
-            st.session_state.step = 0  # 建议返回时重置步数，下次进入从头开始
+            st.session_state.step = 0
             st.rerun()
     st.divider()
 
+    # --- 内容讲解区 ---
     st.header(data['t'])
-    # 如果有详细讲解文字，显示出来
     if 'explanation' in data:
         st.info(data['explanation'])
-    st.write(data['c'])
-
-    # 内容展示区
+    
+    # --- 交互演示区 (分算法渲染) ---
     if data.get("type") == "interactive_demo":
-        # 传入当前步的 snapshot 进行绘图
+        # Dijkstra 渲染：调用你定义的 render_dijkstra_snapshot
         render_dijkstra_snapshot(data['snapshot'])
+        st.write(data['c'])
+        
+    elif data.get("type") == "astar_visual":
+        # A* 增强渲染：左图右表
+        col_viz, col_data = st.columns([1.5, 1])
+        with col_viz:
+            render_astar_snapshot(data['snapshot'])
+        with col_data:
+            st.markdown("🔍 **节点代价分析**")
+            curr_node = data['snapshot']['curr']
+            if curr_node:
+                g = data['snapshot']['g_score'].get(curr_node, 0)
+                goal = data['snapshot']['goal']
+                h = abs(curr_node[0] - goal[0]) + abs(curr_node[1] - goal[1])
+                st.metric("当前处理", f"({curr_node[0]}, {curr_node[1]})")
+                st.write(f"- $g(n)$ (已走): `{g}`")
+                st.write(f"- $h(n)$ (预估): `{h}`")
+                st.write(f"- $f(n)$ (总计): **{g+h}**")
+            else:
+                st.write("等待算法开始...")
+            st.divider()
+            st.write("**算法日志:**")
+            st.write(data['c'])
+            
     else:
-        # 原有的图片/表情渲染（A* 会走这里）
+        # 普通图文/简介模式
         img_path = data.get('img', "💡")
-        if "/" in img_path or img_path.endswith(('.png', '.jpg', '.jpeg')):
-            _, center_col, _ = st.columns([1, 6, 1]) 
-            with center_col:
-                try: st.image(img_path, use_container_width=True)
-                except: st.error(f"图片加载失败: {img_path}")
+        if "/" in str(img_path) or str(img_path).endswith(('.png', '.jpg')):
+            st.image(img_path, use_container_width=True)
         else:
-            st.markdown(f"<h1 style='text-align: center; font-size: 100px;'>{img_path}</h1>", unsafe_allow_html=True)
+            st.markdown(f"<h1 style='text-align:center; font-size:80px;'>{img_path}</h1>", unsafe_allow_html=True)
+        st.write(data['c'])
 
     st.divider()
 
-    # --- 底部导航按钮 (完全控制 step) ---
-    col_l, col_m, col_r = st.columns([1, 1, 1])
-    with col_l:
+    # --- 底部导航控制 ---
+    col_prev, col_mid, col_next = st.columns([1, 1, 1])
+    with col_prev:
         if st.session_state.step > 0:
-            if st.button("⬅️ 上一步", use_container_width=True):
+            if st.button("⬅️ 上一步", use_container_width=True, key="prev_btn"):
                 st.session_state.step -= 1
                 st.rerun()
     
-    with col_r:
-        # 这里会自动根据 steps[algo] 的长度来判断是翻页还是去考试
-        if st.session_state.step < len(steps[algo]) - 1:
-            if st.button("下一步 ➡️", use_container_width=True):
+    with col_mid:
+        st.write(f"<p style='text-align:center; color:gray; padding-top:10px;'>步数: {st.session_state.step + 1} / {len(current_steps_source)}</p>", unsafe_allow_html=True)
+
+    with col_next:
+        if st.session_state.step < len(current_steps_source) - 1:
+            if st.button("下一步 ➡️", use_container_width=True, key="next_btn"):
                 st.session_state.step += 1
                 st.rerun()
         else:
-            # 走到最后一步了
+            # 学习完成阶段
             is_learned = algo in st.session_state.learned_modules
-            btn_label = "已完成测验，可查看题目" if is_learned else "知识检验"
-            
-            if st.button(btn_label, use_container_width=True):
+            btn_label = "✅ 测验通过 (查看)" if is_learned else "🚀 开始知识检验"
+            if st.button(btn_label, use_container_width=True, type="primary", key="go_test_btn"):
                 st.session_state.page = "learning_test"
                 st.rerun()
-        # ... 这里的知识检验/返回首页逻辑保持不变 ...
 
 # --- 4. 知识检验 ---
 # --- 4. 知识检验 ---
@@ -397,6 +548,8 @@ elif st.session_state.page == "learning_test":
 
     st.divider()
 
+    # ... 前接 user_ans 和 correct_ans 的定义 ...
+
     # 提交逻辑
     if is_completed:
         if st.button("返回主页", use_container_width=True):
@@ -404,45 +557,24 @@ elif st.session_state.page == "learning_test":
             st.rerun()
     else:
         if st.button("确认提交", use_container_width=True):
-            # 1. 空值检查
-            if user_ans == "" or user_ans == "请选择一个选项":
-                st.warning("⚠️ 请先完成题目再提交！")
-                st.stop()
-
-            # 2. 格式化处理判定
-            if is_text_input:
-                # 问答题：去空格、转大写进行模糊匹配
-                final_user_ans = user_ans.strip().upper().replace(" ", "")
-                is_correct = any(final_user_ans == str(c).strip().upper().replace(" ", "") for c in correct_ans)
-            else:
-                # 选择题：直接比对是否在列表内
-                is_correct = (user_ans in correct_ans)
-
-            # 3. 结果反馈
+            # 这里的比较逻辑要严谨（去除空格和转大小写）
+            is_correct = any(ans.strip().lower() == user_ans.strip().lower() for ans in correct_ans)
+            
             if is_correct:
+                st.success("🎉 正确！")
+                st.session_state.learned_modules.add(algo)
+                st.session_state.score += 50  # 假设给 50 分
+                # 同步到云端
+                df = get_data()
+                df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
+                save_data(df)
                 st.balloons()
-                st.success("🎉 回答正确！积分 +50")
-                
-                if algo not in st.session_state.learned_modules:
-                    st.session_state.score += 50
-                    st.session_state.learned_modules.add(algo)
-                    try:
-                        df = get_data()
-                        df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
-                        save_data(df)
-                    except:
-                        st.error("云端同步失败，请检查网络")
-                
-                time.sleep(2)
-                st.session_state.page = "dashboard"
+                time.sleep(1)
                 st.rerun()
             else:
-                st.error("答案有误，请再思考一下。")
-                # 修正点3：增加 key 防止 button 重名冲突
-                if st.button("重新看一遍教程", key="relearn_btn"):
-                    st.session_state.step = 0
-                    st.session_state.page = "learning"
-                    st.rerun()
+                st.session_state.last_result = "wrong"
+                st.rerun() # 必须 rerun 才能看到错误提示
+
 # --- 5. 课堂答题 (锁定模式) ---
 elif st.session_state.page == "quiz":
     elapsed = time.time() - st.session_state.start_time
