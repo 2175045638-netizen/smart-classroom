@@ -96,13 +96,12 @@ def generate_dijkstra_steps():
             "snapshot": {"dist_form": dist_formula.copy(), "prev": prev.copy(), "visited": visited.copy(), "curr": curr}
         })
 
-        all_steps.append({
+    all_steps.append({
         "t": "注意事项", 
         "c": ("Dijkstra算法虽然复杂度非常优秀（单源最短路中基本上最优），但是它不能用来计算带有负权边的图，即必须保证图中所有边的权值为非负数。\n\n"
               "请大家思考一下为什么。\n\n"
               "接下来，请完成知识检验考察大家的学习成果吧。"), 
-   
-    })
+    })    
         
     return all_steps
 
