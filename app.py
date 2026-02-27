@@ -328,7 +328,10 @@ elif st.session_state.page == "learning":
                 st.rerun()
         else:
             # 走到最后一步了
-            if st.button("🏁 知识检验", use_container_width=True):
+            is_learned = algo in st.session_state.learned_modules
+            btn_label = "已完成测验，可查看题目" if is_learned else "知识检验"
+            
+            if st.button(btn_label, use_container_width=True):
                 st.session_state.page = "learning_test"
                 st.rerun()
         # ... 这里的知识检验/返回首页逻辑保持不变 ...
@@ -337,6 +340,12 @@ elif st.session_state.page == "learning":
 elif st.session_state.page == "learning_test":
     algo = st.session_state.current_algo
     st.header(f"知识检验: {algo}")
+
+    is_completed = algo in st.session_state.learned_modules
+    
+    st.header(f"{'查看题目' if is_completed else '知识检验'}: {algo}")
+    if is_completed:
+        st.success("提示：你已通过此项测验，当前为查看模式（已显示正确答案）。")
 
     user_ans = ""
     correct_ans = []
