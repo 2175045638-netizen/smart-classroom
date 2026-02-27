@@ -650,7 +650,12 @@ elif st.session_state.page == "learning_test":
 
 # 随堂测试
 elif st.session_state.page == "quiz":
-    st.experimental_autorefresh(interval=2000, key="quizrefresh")
+    if "last_refresh" not in st.session_state:
+        st.session_state.last_refresh = time.time()
+
+    if time.time() - st.session_state.last_refresh > 2:
+        st.session_state.last_refresh = time.time()
+        st.rerun()
     sys_state = get_system_state()
 
     status = safe_get_value(sys_state, "quiz_status", "idle")
