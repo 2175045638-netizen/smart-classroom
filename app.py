@@ -1,10 +1,11 @@
+import os
 import streamlit as st
 import pandas as pd
 import time
-from streamlit_gsheets import GSheetsConnection
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
+from supabase import create_client
 
 # 随堂测试题目数据库定义
 QUIZ_BANK = {
@@ -20,30 +21,48 @@ QUIZ_BANK = {
 }
 
 # 数据库连接与初始化
-conn_data = st.connection("gsheets_data", type=GSheetsConnection)
-conn_control = st.connection("gsheets_control", type=GSheetsConnection)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 学生数据表格
 def get_student_data():
-    return conn_data.read(ttl=10)
+    response = supabase.table("students").select("*").execute()
+    df = pd.DataFrame(response.data)
+    if not df.empty:
+        df = df.rename(columns={
+            "name": "学生",
+            "total_score": "总积分",
+            "dijkstra_done": "Dijkstra_已完成",
+            "astar_done": "AStar_已完成"
+        })
+    return df
 def save_student_data(df):
-    conn_data.update(data=df)
-    st.cache_data.clear()
+    for _, row in df.iterrows():
+        supabase.table("students").upsert({
+            "name": row["学生"],
+            "total_score": int(row["总积分"]),
+            "dijkstra_done": bool(row["Dijkstra_已完成"]),
+            "astar_done": bool(row["AStar_已完成"])
+        }).execute()
 
-# 答题状态控制表
+# 课堂答题状态控制表
 def get_system_state():
-    return conn_control.read(ttl=10)
+    response = supabase.table("classroom_state").select("*").execute()
+    df = pd.DataFrame(response.data)
+    if df.empty:
+        df = pd.DataFrame([
+            {"key": "quiz_status", "value": "idle"},
+            {"key": "current_topic", "value": "None"},
+            {"key": "start_time", "value": "0"}
+        ])
+    return df
 def update_system_state(df):
-    conn_control.update(data=df)
-    
-# 自动更新系统
-def update_system_state(df):
-    try:
-        conn_control.update(data=df)
-    except Exception as e:
-        if "429" in str(e):
-            st.error("操作太快啦！Google 正在排队，请 5 秒后重试。")
-            time.sleep(5)
+    for _, row in df.iterrows():
+        supabase.table("classroom_state").upsert({
+            "key": row["key"],
+            "value": str(row["value"])
+        }).execute()
 
 # 初始化全局状态
 def init_state():
@@ -351,31 +370,31 @@ with st.sidebar:
             st.success("云端数据同步成功！")
 
         st.subheader("课堂答题同步控制")
-        state_df = conn_control.read(ttl=60)
+        state_df = get_system_state()
 
         selected_topic = st.selectbox("选择本次答题主题", list(QUIZ_BANK.keys()))
     
         col_admin1, col_admin2, col_admin3 = st.columns(3)
         with col_admin1:
             if st.button("发布主题"):
-                state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'ready'
-                state_df.loc[state_df['Key'] == 'current_topic', 'Value'] = selected_topic
+                state_df.loc[state_df['key'] == 'quiz_status', 'value'] = 'ready'
+                state_df.loc[state_df['key'] == 'current_topic', 'value'] = selected_topic
                 update_system_state(state_df)
                 st.success(f"已发布: {selected_topic}")
             
         with col_admin2:
             if st.button("开始答题"):
-                state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'started'
-                state_df.loc[state_df['Key'] == 'start_time', 'Value'] = str(time.time())
+                state_df.loc[state_df['key'] == 'quiz_status', 'value'] = 'started'
+                state_df.loc[state_df['key'] == 'start_time', 'value'] = str(time.time())
                 update_system_state(state_df)
                 st.toast("全员计时开始！")
 
         with col_admin3:
             if st.button("结束答题", use_container_width=True):
                 # 将状态设为 idle (闲置)
-                state_df.loc[state_df['Key'] == 'quiz_status', 'Value'] = 'idle'
+                state_df.loc[state_df['key'] == 'quiz_status', 'value'] = 'idle'
                 # 清空当前主题
-                state_df.loc[state_df['Key'] == 'current_topic', 'Value'] = 'None'
+                state_df.loc[state_df['key'] == 'current_topic', 'value'] = 'None'
                 update_system_state(state_df)
                 st.toast("答题通道已关闭")
                 st.rerun()
@@ -411,7 +430,7 @@ elif st.session_state.page == "dashboard":
     sys_state = get_system_state()
 
     try:
-        current_status = sys_state.loc[sys_state['Key'] == 'quiz_status', 'Value'].values[0]
+        current_status = sys_state.loc[sys_state['key'] == 'quiz_status', 'value'].values[0]
     except:
         current_status = 'idle'
 
@@ -627,9 +646,11 @@ elif st.session_state.page == "learning_test":
 
 # 随堂测试
 elif st.session_state.page == "quiz":
+    st.experimental_autorefresh(interval=2000, key="quizrefresh")
     sys_state = get_system_state()
-    status = sys_state.loc[sys_state['Key'] == 'quiz_status', 'Value'].values[0]
-    topic = sys_state.loc[sys_state['Key'] == 'current_topic', 'Value'].values[0]
+
+    status = sys_state.loc[sys_state['key'] == 'quiz_status', 'value'].values[0]
+    topic = sys_state.loc[sys_state['key'] == 'current_topic', 'value'].values[0]
     
     questions = QUIZ_BANK.get(topic, [])
     total_q = len(questions)
@@ -642,7 +663,7 @@ elif st.session_state.page == "quiz":
 
     elif status == "started":
         # 计算统一时间
-        global_start = float(sys_state.loc[sys_state['Key'] == 'start_time', 'Value'].values[0])
+        global_start = float(sys_state.loc[sys_state['key'] == 'start_time', 'value'].values[0])
         elapsed = time.time() - global_start
         remaining = max(0, int(120 - elapsed)) # 假设总时长120秒
         
@@ -681,11 +702,20 @@ elif st.session_state.page == "quiz":
 elif st.session_state.page == "result":
     st.title("答题报告")
     st.metric("本次得分", st.session_state.quiz_score)
-    st.session_state.score += st.session_state.quiz_score
-    df = get_student_data()
-    df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
-    save_student_data(df)
-    if st.button("返回大厅"): st.session_state.page = "dashboard"; st.rerun()
+
+    if not st.session_state.get("quiz_settled", False):
+        st.session_state.score += st.session_state.quiz_score
+        df = get_student_data()
+        df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
+        save_student_data(df)
+        st.session_state.quiz_settled = True
+
+    if st.button("返回大厅"):
+        st.session_state.quiz_settled = False
+        st.session_state.quiz_score = 0
+        st.session_state.quiz_step = 0
+        st.session_state.page = "dashboard"
+        st.rerun()
 
 # 积分排行榜
 elif st.session_state.page == "leaderboard":
