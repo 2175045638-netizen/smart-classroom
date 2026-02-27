@@ -418,9 +418,9 @@ with st.sidebar:
                 session_id = safe_get_value(sys_state, "current_session_id", None)
 
                 if session_id:
-                    supabase.table("quiz_sessions").update({
-                        "ended_at": time.strftime("%Y-%m-%d %H:%M:%S")
-                    }).eq("id", session_id).execute()
+                    supabase.table("classroom_state").update({
+                        "value": None
+                    }).eq("key", "current_session_id").execute()
                 state_df.loc[state_df['key'] == 'quiz_status', 'value'] = 'idle'
                 state_df.loc[state_df['key'] == 'current_topic', 'value'] = 'None'
                 state_df.loc[state_df['key'] == 'current_session_id', 'value'] = "closed" 
