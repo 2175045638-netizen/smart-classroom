@@ -341,7 +341,7 @@ elif st.session_state.page == "learning_test":
     algo = st.session_state.current_algo
     is_completed = algo in st.session_state.learned_modules
     
-    st.header(f"{'👁️ 查看题目' if is_completed else '🎯 知识检验'}: {algo}")
+    st.header(f"{'查看题目' if is_completed else '知识检验'}: {algo}")
     if is_completed:
         st.success("提示：你已通过此项测验，当前为查看模式（已显示正确答案）。")
 
