@@ -454,10 +454,14 @@ elif st.session_state.page == "dashboard":
     with st.expander("📍 路径规划算法板块", expanded=True):
         c1, c2 = st.columns(2)
         with c1:
+            is_done = "AStar" in st.session_state.learned_modules
+            label = "【✅ 已掌握】" if is_done else ""
             st.markdown('<div class="algo-card"><h3>Dijkstra 算法</h3></div>', unsafe_allow_html=True)
             if st.button("进入学习", key="dij"):
                 st.session_state.current_algo = "Dijkstra"; st.session_state.page = "learning"; st.session_state.step = 0; st.rerun()
         with c2:
+            is_done = "Dijkstra" in st.session_state.learned_modules
+            label = "【✅ 已掌握】" if is_done else ""
             st.markdown('<div class="algo-card"><h3>A* 算法</h3></div>', unsafe_allow_html=True)
             if st.button("进入学习", key="astar"):
                 st.session_state.current_algo = "AStar"; st.session_state.page = "learning"; st.session_state.step = 0; st.rerun()
