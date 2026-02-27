@@ -75,6 +75,8 @@ def init_state():
         st.session_state.learned_modules = set()
     if 'step' not in st.session_state:
         st.session_state.step = 0
+    if 'quiz_finished' not in st.session_state:
+        st.session_state.quiz_finished = False
 
 # 迪杰斯特拉算法教学内容设计
 def generate_dijkstra_steps():
@@ -466,6 +468,9 @@ elif st.session_state.page == "dashboard":
         # 只有在老师发布了题目（ready）或者正在答题（started）时才显示按钮
         st.warning("限时随堂测试已发布")
         if st.button("开始进入答题模式", use_container_width=True):
+            if st.session_state.quiz_finished:
+                st.session_state.page = "result"
+                st.rerun()
             # 初始化答题状态
             st.session_state.quiz_settled = False
             st.session_state.finish_time = 0
@@ -678,11 +683,14 @@ elif st.session_state.page == "quiz":
 
     st.title(f"课堂测试：{topic}")
 
+    if status == "idle" and st.session_state.page != "quiz":
+        st.session_state.quiz_finished = False
+
     if status == "ready":
         st.info("答题主题已就绪，请等待老师点击『开始答题』...")
         if st.button("刷新状态"): st.rerun()
 
-    elif status == "started":
+    if status == "started":
         # 计算统一时间
         global_start = float(safe_get_value(sys_state, "start_time", "0"))
         elapsed = time.time() - global_start
@@ -690,6 +698,7 @@ elif st.session_state.page == "quiz":
         
         if remaining <= 0:
             st.warning("时间到！正在自动结算...")
+            st.session_state.quiz_finished = True
             st.session_state.page = "result"; st.rerun()
 
         st.error(f"全班统一倒计时：{remaining} 秒")
@@ -714,6 +723,7 @@ elif st.session_state.page == "quiz":
                     st.session_state.quiz_step = current_q_idx + 1
                 else:
                     st.session_state.finish_time = elapsed
+                    st.session_state.quiz_finished = True
                     st.session_state.page = "result"
                 st.rerun()
         else:
@@ -733,11 +743,12 @@ elif st.session_state.page == "result":
         save_student_data(df)
         st.session_state.quiz_settled = True
 
-    if st.button("返回大厅"):
+    if st.button("返回主页"):
         st.session_state.quiz_settled = False
         st.session_state.quiz_score = 0
         st.session_state.quiz_step = 0
         st.session_state.page = "dashboard"
+        st.session_state.quiz_finished = True
         st.rerun()
 
 # 积分排行榜
