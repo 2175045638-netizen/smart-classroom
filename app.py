@@ -29,22 +29,16 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 def get_student_data():
     response = supabase.table("students").select("*").execute()
     df = pd.DataFrame(response.data)
-    if not df.empty:
-        df = df.rename(columns={
-            "name": "学生",
-            "total_score": "总积分",
-            "dijkstra_done": "Dijkstra_已完成",
-            "astar_done": "AStar_已完成"
-        })
+    if df.empty:
+        df = pd.DataFrame(columns=[
+            "name",
+            "total_score",
+            "dijkstra_completed",
+            "astar_completed"
+        ])
     return df
 def save_student_data(df):
-    for _, row in df.iterrows():
-        supabase.table("students").upsert({
-            "name": row["学生"],
-            "total_score": int(row["总积分"]),
-            "dijkstra_done": bool(row["Dijkstra_已完成"]),
-            "astar_done": bool(row["AStar_已完成"])
-        }).execute()
+    supabase.table("students").upsert(df.to_dict(orient="records")).execute()
 
 # 课堂答题状态控制表
 def get_system_state():
@@ -63,6 +57,11 @@ def update_system_state(df):
             "key": row["key"],
             "value": str(row["value"])
         }).execute()
+
+
+def safe_get_value(df, key, default):
+    result = df.loc[df["key"] == key, "value"]
+    return result.values[0] if not result.empty else default
 
 # 初始化全局状态
 def init_state():
@@ -408,20 +407,25 @@ if st.session_state.page == "login":
             st.session_state.user = name
             # 登录时从云端同步数据
             df = get_student_data()
-            if name in df["学生"].values:
-                user_row = df[df["学生"] == name].iloc[0]
-                st.session_state.score = int(user_row["总积分"])
+            if name in df["name"].values:
+                user_row = df[df["name"] == name].iloc[0]
+                st.session_state.score = int(user_row["total_score"])
                 learned = set()
-                if user_row.get("Dijkstra_已完成") == True: learned.add("Dijkstra")
-                if user_row.get("AStar_已完成") == True: learned.add("AStar")
+                if user_row.get("dijkstra_completed") == True: learned.add("dijkstra")
+                if user_row.get("astar_completed") == True: learned.add("astar")
                 st.session_state.learned_modules = learned
             else:
                 # 新学生自动注册
-                new_user = pd.DataFrame([{"学生": name, 
-                    "总积分": 0, 
-                    "Dijkstra_已完成": False, 
-                    "AStar_已完成": False}])
-                save_student_data(pd.concat([df, new_user], ignore_index=True))
+                new_user = pd.DataFrame([{"name": name, 
+                    "total_score": 0, 
+                    "dijkstra_completed": False, 
+                    "astar_completed": False}])
+                supabase.table("students").insert({
+                    "name": name,
+                    "total_score": 0,
+                    "dijkstra_completed": False,
+                    "astar_completed": False
+                }).execute()
             st.session_state.page = "dashboard"
             st.rerun()
 
@@ -449,11 +453,11 @@ elif st.session_state.page == "dashboard":
         with c1:
             st.markdown('<div class="algo-card"><h3>Dijkstra 算法</h3></div>', unsafe_allow_html=True)
             if st.button("进入学习", key="dij"):
-                st.session_state.current_algo = "Dijkstra"; st.session_state.page = "learning"; st.session_state.step = 0; st.rerun()
+                st.session_state.current_algo = "dijkstra"; st.session_state.page = "learning"; st.session_state.step = 0; st.rerun()
         with c2:
             st.markdown('<div class="algo-card"><h3>A* 算法</h3></div>', unsafe_allow_html=True)
             if st.button("进入学习", key="astar"):
-                st.session_state.current_algo = "AStar"; st.session_state.page = "learning"; st.session_state.step = 0; st.rerun()
+                st.session_state.current_algo = "astar"; st.session_state.page = "learning"; st.session_state.step = 0; st.rerun()
 
     st.divider()
     if current_status in ["ready", "started"]:
@@ -473,7 +477,7 @@ elif st.session_state.page == "dashboard":
 elif st.session_state.page == "learning":
     algo = st.session_state.current_algo
     
-    if algo == "AStar":
+    if algo == "astar":
         if "astar_full_steps" not in st.session_state:
             st.session_state.astar_full_steps = generate_Astar_full_steps()
         current_steps_source = st.session_state.astar_full_steps
@@ -572,7 +576,7 @@ elif st.session_state.page == "learning_test":
     is_text_input = False 
     
     with st.container():
-        if algo == "Dijkstra":
+        if algo == "dijkstra":
             st.write("如图，这是一个有向加权图，权重代表两点之间的距离。请使用 Dijkstra 算法，计算出从A点到F点的最短路径。")
             ans_str = "A->B->D->F"
             correct_ans = [ans_str] 
@@ -591,7 +595,7 @@ elif st.session_state.page == "learning_test":
             
             is_text_input = True
             
-        elif algo == "AStar":
+        elif algo == "astar":
             options = [
                 "从起点到当前节点的实际代价", 
                 "从当前节点到终点的预估代价", 
@@ -630,10 +634,10 @@ elif st.session_state.page == "learning_test":
                 st.session_state.score += 50  # 假设给 50 分
                 # 同步到云端
                 df = get_student_data()
-                idx = df[df["学生"] == st.session_state.user].index
+                idx = df[df["name"] == st.session_state.user].index
                 if not idx.empty:
-                    df.loc[idx, "总积分"] = st.session_state.score
-                    column_name = f"{algo}_已完成"
+                    df.loc[idx, "total_score"] = st.session_state.score
+                    column_name = f"{algo}_completed"
                     if column_name in df.columns:
                         df.loc[idx, column_name] = True
                     save_student_data(df)
@@ -649,8 +653,8 @@ elif st.session_state.page == "quiz":
     st.experimental_autorefresh(interval=2000, key="quizrefresh")
     sys_state = get_system_state()
 
-    status = sys_state.loc[sys_state['key'] == 'quiz_status', 'value'].values[0]
-    topic = sys_state.loc[sys_state['key'] == 'current_topic', 'value'].values[0]
+    status = safe_get_value(sys_state, "quiz_status", "idle")
+    topic = safe_get_value(sys_state, "current_topic", "None")
     
     questions = QUIZ_BANK.get(topic, [])
     total_q = len(questions)
@@ -663,7 +667,7 @@ elif st.session_state.page == "quiz":
 
     elif status == "started":
         # 计算统一时间
-        global_start = float(sys_state.loc[sys_state['key'] == 'start_time', 'value'].values[0])
+        global_start = float(safe_get_value(sys_state, "start_time", "0"))
         elapsed = time.time() - global_start
         remaining = max(0, int(120 - elapsed)) # 假设总时长120秒
         
@@ -706,7 +710,7 @@ elif st.session_state.page == "result":
     if not st.session_state.get("quiz_settled", False):
         st.session_state.score += st.session_state.quiz_score
         df = get_student_data()
-        df.loc[df["学生"] == st.session_state.user, "总积分"] = st.session_state.score
+        df.loc[df["name"] == st.session_state.user, "total_score"] = st.session_state.score
         save_student_data(df)
         st.session_state.quiz_settled = True
 
@@ -720,11 +724,11 @@ elif st.session_state.page == "result":
 # 积分排行榜
 elif st.session_state.page == "leaderboard":
     st.title("积分排行榜")
-    df = get_student_data().sort_values(by="总积分", ascending=False).reset_index(drop=True)
+    df = get_student_data().sort_values(by="total_score", ascending=False).reset_index(drop=True)
     for i, row in df.iterrows():
         style = f"rank-{i+1}" if i < 3 else ""
         st.markdown(f'<div style="display:flex; justify-content:space-between; padding:10px;">'
-                    f'<span class="{style}">第 {i+1} 名: {row["学生"]}</span>'
-                    f'<span>{row["总积分"]} pts</span></div>', unsafe_allow_html=True)
+                    f'<span class="{style}">第 {i+1} 名: {row["name"]}</span>'
+                    f'<span>{row["total_score"]} pts</span></div>', unsafe_allow_html=True)
     if st.button("返回"): st.session_state.page = "dashboard"; st.rerun()
        
