@@ -376,10 +376,6 @@ with st.sidebar:
     if admin_pwd == PROFESSOR_KEY:
         st.subheader("教师后台数据管理")
         all_data = get_student_data()
-        edited_df = st.data_editor(all_data, num_rows="dynamic")
-        if st.button("保存修改到云端"):
-            save_student_data(edited_df)
-            st.success("云端数据同步成功！")
 
         st.subheader("课堂答题同步控制")
         state_df = get_system_state()
