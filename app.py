@@ -23,6 +23,7 @@ QUIZ_BANK = {
 # 数据库连接与初始化
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+PROFESSOR_KEY = os.getenv("PROFESSOR_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 学生数据表格
@@ -372,7 +373,7 @@ st.markdown("""
 with st.sidebar:
     st.title("管理面板")
     admin_pwd = st.text_input("管理员密码", type="password")
-    if admin_pwd == "666888": # 你可以修改自己的密码
+    if admin_pwd == PROFESSOR_KEY:
         st.subheader("教师后台数据管理")
         all_data = get_student_data()
         edited_df = st.data_editor(all_data, num_rows="dynamic")
